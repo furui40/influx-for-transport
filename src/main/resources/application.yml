@@ -1,0 +1,14 @@
+spring:
+  influx:
+    url: http://localhost:8086/
+    username: admin
+    password: 12345678
+    token: i_P6S7q6YtdDZtOcT4ZKsfCb-KnQZ25NIvJ3v3YfDNAPI4wWwca9BA8yP9AYUNvvXcQk6w7LjIqSUsF9aJC85Q==
+    org: test
+    bucket: test4
+#??influx??
+management:
+  metrics:
+    export:
+      influx:
+        enabled: false
