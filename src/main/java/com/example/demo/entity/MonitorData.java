@@ -10,37 +10,37 @@ import java.time.Instant;
 
 @Data
 @Accessors(chain = true)
-@Measurement(name = "device_history_location")
+@Measurement(name = "sensor_data")
 public class MonitorData {
 
     /**
-     * 设备id
+     * 解调器id
      */
-    @Column(name = "device_id",tag = true)
-    private String deviceId;
+    @Column(name = "decoder_id",tag = true)
+    private String decoderId;
 
     /**
-     * 车辆id
+     * 信道id
      */
-    @Column(name = "vehicle_id")
-    private String vehicleId;
+    @Column(name = "channel_id",tag = true)
+    private String channelId;
 
     /**
-     * 位置时间
+     * 时间
      */
     @Column(timestamp = true)
     private Instant locationTime;
 
     /**
-     * 经度
+     * 原始值
      */
-    @Column(name = "longitude")
-    private BigDecimal longitude;
+    @Column(name = "originalValue")
+    private double originalValue;
 
     /**
-     * 纬度
+     * 实际值
      */
-    @Column(name = "latitude")
-    private BigDecimal latitude;
+    @Column(name = "actualValue")
+    private double actualValue;
 
 }
