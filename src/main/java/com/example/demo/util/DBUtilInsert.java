@@ -16,7 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 @Slf4j
-public class DBUtil {
+public class DBUtilInsert {
 
     private static String influxDbOrg = "test";
 
@@ -26,12 +26,9 @@ public class DBUtil {
 
     public static final int MAX_CHANNELS = 32; // 最大信道数量
     private static final int SAMPLING_FREQUENCY_HZ = 1000; // 采样频率 (Hz)
-    // 写入测试数据
 
     public static void writeData(InfluxDBClient client, List<MonitorData> monitorData) {
         WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
-
-        // 每次写入的数据量
 
         // 按照批次拆分数据并写入
         List<MonitorData> batch = new ArrayList<>();
@@ -353,23 +350,5 @@ public class DBUtil {
         }
     }
 
-    // 查询数据
-    public static void queryData(InfluxDBClient client) {
-        String flux = "from(bucket: \"test3\") "  // 这里双引号需要转义
-                + "  |> range(start: 0) ";  // 查询时间范围
-        // 执行查询
-        List<FluxTable> query = client.getQueryApi().query(flux);
-
-        // 输出查询结果
-        for (FluxTable table : query) {
-            List<FluxRecord> records = table.getRecords();
-            for (FluxRecord record : records) {
-                System.out.println("Measurement: " + record.getMeasurement() +
-                        ", Field: " + record.getField() +
-                        ", Value: " + record.getValue() +
-                        ", Time: " + record.getTime().plus(Duration.ofHours(8)));
-            }
-        }
-    }
 
 }
