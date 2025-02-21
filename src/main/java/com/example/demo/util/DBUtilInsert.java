@@ -4,8 +4,6 @@ import com.example.demo.entity.MonitorData;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.WriteApiBlocking;
 import com.influxdb.client.domain.WritePrecision;
-import com.influxdb.query.FluxRecord;
-import com.influxdb.query.FluxTable;
 import lombok.extern.slf4j.Slf4j;
 
 
@@ -20,9 +18,9 @@ public class DBUtilInsert {
 
     private static String influxDbOrg = "test";
 
-    private static String influxDbBucket = "test2";
+    private static String influxDbBucket = "test5";
 
-    public static final int BATCH_SIZE = 3200000;
+    public static final int BATCH_SIZE = 100000;
 
     public static final int MAX_CHANNELS = 32; // 最大信道数量
     private static final int SAMPLING_FREQUENCY_HZ = 1000; // 采样频率 (Hz)
@@ -231,12 +229,15 @@ public class DBUtilInsert {
         List<String> batchLines = new ArrayList<>(BATCH_SIZE);
         List<String> batchLinesForFile = new ArrayList<>(BATCH_SIZE); // 用于写入文件的批量数据
 
+        // 从文件路径中提取解调器编号
+        String decoderId = filePath.split("\\\\")[2]; // 例如：从 "E:\\decoder\\01\\Wave_20240712_010000.txt" 中提取 "01"
+        int decoderNumber = Integer.parseInt(decoderId); // 转换为整数
+
         // 跳过文件的第一行表头
         reader.readLine();
 
         // 读取文件并处理
         while ((line = reader.readLine()) != null) {
-
             String[] columns = line.split("\t");
             if (columns.length < 4) {
                 continue;
@@ -244,74 +245,76 @@ public class DBUtilInsert {
 
             String baseTime = columns[2].trim(); // 基准时间
             int counter = timeCounts.getOrDefault(baseTime, 0); // 当前时间点的计数
+
+            // 如果当前时间点的数据量已经达到 1000 条，则跳过
+            if (counter >= 1000) {
+                continue;
+            }
+
             timeCounts.put(baseTime, counter + 1); // 更新计数器
 
             // 转换基准时间为纳秒时间戳
-            long timestampNs = convertTimestamp(baseTime, counter, SAMPLING_FREQUENCY_HZ);
+            long timestampNs = convertTimestamp(baseTime, counter, 1000); // 采样频率为 1000Hz
 
-            // 处理每个信道的数据
-            int channelIdx = 1;  // 从第一个信道开始
-            for (int i = 3; i < columns.length; i++) {  // 从第4列开始
+            // 创建一个 StringBuilder 来构建包含所有信道数据的行协议
+            StringBuilder lineProtocolBuilder = new StringBuilder();
+            lineProtocolBuilder.append(String.format("sensor_data,decoder=%d ", decoderNumber)); // 设置解调器编号
+
+            // 处理每个信道的数据（从第4列开始，每隔3列取一个信道，共32个信道）
+            int validChannelCount = 0; // 有效信道的计数器
+            for (int i = 3; i < columns.length && validChannelCount < 32; i += 3) { // 每隔3列取一个信道
                 String value = columns[i].replace("|", "").trim();
 
-                if (value.isEmpty()) {
-                    continue;  // 如果值为空或仅含竖线，则跳过
+                // 如果值为空或仅包含竖线或空格，则跳过该信道
+                if (value.isEmpty() || value.equals("|") || value.equals(" ")) {
+                    continue;
                 }
 
                 try {
                     float floatValue = Float.parseFloat(value);
-                    if (channelIdx > MAX_CHANNELS) {
-                        break; // 超过最大信道数，跳出
-                    }
-
-                    // 创建 InfluxDB 行协议
-                    String lineProtocol = String.format(
-                            "sensor_data,decoder=1,channel=Ch%d value=%f %d",
-                            channelIdx, floatValue, timestampNs);
-
-                    batchLines.add(lineProtocol); // 将行协议添加到批量中
-                    batchLinesForFile.add(lineProtocol); // 将行协议添加到写入文件的批量中
-
-                    processedLines++;
-
-                    // 如果批量达到指定大小，写入文件和数据库
-                    if (batchLines.size() >= BATCH_SIZE) {
-                        // 写入文件
-//                        writeBatchToFile(batchLinesForFile, filePath);
-
-                        // 写入数据库
-                        writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batchLines));
-
-                        batchLines.clear(); // 清空批量数据
-                        batchLinesForFile.clear(); // 清空写入文件的批量数据
-
-                        batchCount++;
-                        long elapsedTime = System.currentTimeMillis() - startTime;
-                        System.out.println("已写入 " + batchCount * BATCH_SIZE / 32 + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
-
-                        // 如果处理了 10000000 条数据，停止程序
-                        if (processedLines >= 10000000) {
-                            System.out.println("已处理 10000000 条数据，程序中止！");
-                            reader.close();
-                            return; // 结束处理
-                        }
-                    }
-
-                    // 只有在成功处理了有效值后，才增加 channelIdx
-                    channelIdx++;
-
+                    validChannelCount++; // 只有有效值才会增加信道计数器
+                    lineProtocolBuilder.append(String.format("Ch%d=%f,", validChannelCount, floatValue)); // 信道编号从1开始
                 } catch (NumberFormatException e) {
-                    // 如果数据无法解析为数字，则跳过
+                    // 如果数据无法解析为数字，则跳过该信道
                     continue;
+                }
+            }
+
+            // 去掉最后一个逗号并添加时间戳
+            if (lineProtocolBuilder.length() > 0) {
+                lineProtocolBuilder.setLength(lineProtocolBuilder.length() - 1); // 去掉最后一个逗号
+                lineProtocolBuilder.append(String.format(" %d", timestampNs));
+
+                // 将行协议添加到批量中
+                batchLines.add(lineProtocolBuilder.toString());
+                batchLinesForFile.add(lineProtocolBuilder.toString());
+
+                processedLines++;
+
+                // 如果批量达到指定大小，写入文件和数据库
+                if (batchLines.size() >= BATCH_SIZE) {
+                    // 写入数据库
+                    writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batchLines));
+
+                    batchLines.clear(); // 清空批量数据
+                    batchLinesForFile.clear(); // 清空写入文件的批量数据
+
+                    batchCount++;
+                    long elapsedTime = System.currentTimeMillis() - startTime;
+                    System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
+
+                    // 如果处理了 10000000 条数据，停止程序
+                    if (processedLines >= 10000000) {
+                        System.out.println("已处理 10000000 条数据，程序中止！");
+                        reader.close();
+                        return; // 结束处理
+                    }
                 }
             }
         }
 
         // 处理剩余的批量数据
         if (!batchLines.isEmpty()) {
-            // 写入文件
-//            writeBatchToFile(batchLinesForFile, filePath);
-
             // 写入数据库
             writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batchLines));
             batchCount++;
@@ -320,8 +323,8 @@ public class DBUtilInsert {
         }
 
         reader.close();
-        System.out.println("数据写入完成，共处理 " + processedLines/32 + " 条数据。");
-        return ;
+        System.out.println("数据写入完成，共处理 " + processedLines + " 条数据。");
+        return;
     }
 
     private static long convertTimestamp(String baseTime, int counter, int frequency) {
