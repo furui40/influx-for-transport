@@ -5,8 +5,6 @@ import com.influxdb.annotations.Measurement;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
-import java.time.Instant;
-
 @Data
 @Accessors(chain = true)
 @Measurement(name = "user_data")

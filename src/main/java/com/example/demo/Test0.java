@@ -1,7 +1,13 @@
 package com.example.demo;
 
+import com.example.demo.common.CommonResult;
+import com.example.demo.entity.WeightData;
+import com.example.demo.resolver.DynamicWeighing;
+import com.example.demo.util.DBUtilInsert;
 import com.example.demo.util.DBUtilSearch;
 import com.example.demo.util.DBUtilUser;
+import com.example.demo.util.DataRevise;
+import com.example.demo.util.DataRevise2;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
 import com.influxdb.client.WriteApiBlocking;
@@ -10,8 +16,11 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
 
-import static com.example.demo.util.DBUtilInsert.writeDataFromFile;
+import static com.example.demo.util.DBUtilInsert.writeDataFromFile2;
+import static com.example.demo.util.DBUtilInsert.writeDataFromFile1;
 
 
 @Component
@@ -34,6 +43,9 @@ public class Test0 {
         // 使用从配置文件中获取的值创建 InfluxDB 客户端
         InfluxDBClient client = InfluxDBClientFactory.create(influxDbUrl, influxDbToken.toCharArray(), influxDbOrg);
 
+//        DBUtilInsert.testsearch(client,"1","01");
+//        client.close();
+
         // 解调器编号列表
 //        int[] decoderNumbers = {1, 2, 3, 4};
 //        String date = "20240712"; // 日期
@@ -46,7 +58,7 @@ public class Test0 {
 //                String decoderPath = basePath + "\\" + decoderId; // 解调器路径
 //
 //                // 遍历 24 小时的数据文件
-//                for (int hour = 0; hour < 24; hour++) {
+//                for (int hour = 10; hour < 16; hour++) {
 //                    String hourStr = String.format("%02d0000", hour); // 格式化为小时，例如 "010000"
 //                    String filePath = decoderPath + "\\Wave_" + date + "_" + hourStr + ".txt"; // 文件路径
 //
@@ -59,7 +71,7 @@ public class Test0 {
 //
 //                    // 从文件中读取并写入数据
 //                    System.out.println("正在处理文件: " + filePath);
-//                    writeDataFromFile(client, filePath);
+//                    writeDataFromFile1(client, filePath);
 //                }
 //            }
 //        } catch (IOException e) {
@@ -74,12 +86,32 @@ public class Test0 {
 //        client.close();
 
         // 注册新用户
-//        String registrationResult = DBUtilUser.registerUser(client, "john_doe", "password123");
-//        System.out.println(registrationResult);
+//        CommonResult registrationResult = DBUtilUser.registerUser(client, "123", "123");
+//        System.out.println(registrationResult.getMessage());
 
         // 验证登录
-//        String loginResult = DBUtilUser.validateLogin(client, "john_doe", "password1234");
-//        System.out.println(loginResult);
+//        CommonResult loginResult = DBUtilUser.validateLogin(client, "123", "123");
+//        System.out.println(loginResult.getMessage() + loginResult.getData());
 
+
+//        DataRevise.dataRevise(client, Instant.ofEpochSecond(1720749600L), Instant.ofEpochSecond(1720774800L));
+//        System.out.println("finished");
+//        client.close();
+
+//        DataRevise2.dataRevise2(client, Instant.ofEpochSecond(1720749600L), Instant.ofEpochSecond(1720774800L));
+//        System.out.println("finished");
+//        client.close();
+
+//        DynamicWeighing.processFile(client,"E:\\data\\2024_season1_weight\\2024_season1_weight\\20231104.xlsx");
+//        System.out.println("finished");
+
+        Instant startTime = Instant.parse("2023-11-04T00:17:27.000Z");
+        Instant stopTime = Instant.parse("2023-11-04T14:28:37.000Z");
+        List<WeightData> weightDataList = DynamicWeighing.queryWeightData(client,startTime,stopTime);
+        // 打印查询结果
+        for (WeightData weightData : weightDataList) {
+            System.out.println(weightData);
+        }
+        client.close();
     }
 }

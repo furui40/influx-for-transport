@@ -1,9 +1,12 @@
 package com.example.demo.util;
 
 import com.example.demo.entity.MonitorData;
+import com.example.demo.entity.User;
 import com.influxdb.client.InfluxDBClient;
+import com.influxdb.client.QueryApi;
 import com.influxdb.client.WriteApiBlocking;
 import com.influxdb.client.domain.WritePrecision;
+import com.influxdb.client.write.Point;
 import lombok.extern.slf4j.Slf4j;
 
 
@@ -18,207 +21,312 @@ public class DBUtilInsert {
 
     private static String influxDbOrg = "test";
 
-    private static String influxDbBucket = "test5";
+    private static String influxDbBucket = "test2";
 
     public static final int BATCH_SIZE = 100000;
 
     public static final int MAX_CHANNELS = 32; // 最大信道数量
     private static final int SAMPLING_FREQUENCY_HZ = 1000; // 采样频率 (Hz)
 
-    public static void writeData(InfluxDBClient client, List<MonitorData> monitorData) {
-        WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
+//    public static void writeData(InfluxDBClient client, List<MonitorData> monitorData) {
+//        WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
+//
+//        // 按照批次拆分数据并写入
+//        List<MonitorData> batch = new ArrayList<>();
+//        for (int i = 0; i < monitorData.size(); i++) {
+//            batch.add(monitorData.get(i));
+//
+//            // 当批次大小达到设定值时，执行写入操作
+//            if (batch.size() >= BATCH_SIZE || i == monitorData.size() - 1) {
+//                // 写入当前批次的数据
+//                writeApiBlocking.writeMeasurements("test2", "test", WritePrecision.NS, batch);
+//                log.info("Batch {} written successfully, size: {}", i / BATCH_SIZE + 1, batch.size());
+//
+//                // 清空批次
+//                batch.clear();
+//            }
+//        }
+//
+//        log.info("All data written successfully to InfluxDB.");
+//    }
+//
+//
+//    public static List<MonitorData> generateTestData() {
+//        // 创建模拟的传感器数据
+//        List<MonitorData> monitorDataList = new ArrayList<>();
+//
+//        // 获取当前时间作为第一个时间戳
+//        Instant time = Instant.now().minus(Duration.ofHours(2400));
+//
+//        // 随机数生成器，用于生成时间间隔
+//        Random random = new Random();
+//
+//        // 创建 5 条模拟数据
+//        for (int i = 0; i < 10000; i++) {
+//            // 随机生成1到1000毫秒之间的时间间隔
+//            long randomInterval = 1 + random.nextInt(10);
+//
+//            // 设置时间戳为当前时间 + 随机时间间隔
+//            time = time.plusMillis(randomInterval);
+//
+//            // 创建 MonitorData 对象并设置值
+//            MonitorData data = new MonitorData()
+//                    .setDecoderId("1")   // 设置解调器ID
+//                    .setChannelId("ch1")   // 设置信道ID
+//                    .setLocationTime(time)  // 设置时间，间隔随机
+//                    .setOriginalValue(Math.random() * 100)   // 随机生成原始值
+//                    .setActualValue(Math.random() * 100);    // 随机生成实际值
+//
+//            // 添加到数据列表
+//            monitorDataList.add(data);
+//        }
+//
+//        return monitorDataList;
+//    }
+//
+//    public static void readDataFromFileAndWrite(InfluxDBClient client, String filePath) {
+//        List<MonitorData> monitorDataBatch = new ArrayList<>();
+//        try (BufferedReader br = new BufferedReader(new FileReader(new File(filePath)))) {
+//            String line;
+//            while ((line = br.readLine()) != null) {
+//                // 解析数据
+//                MonitorData data = parseLineToMonitorData(line);
+//                monitorDataBatch.add(data);
+//
+//                // 当批量数据达到指定大小时，写入 InfluxDB
+//                if (monitorDataBatch.size() >= BATCH_SIZE) {
+//                    writeData(client, monitorDataBatch);
+//                    monitorDataBatch.clear();  // 清空批次数据
+//                }
+//            }
+//
+//            // 写入剩余的数据（不足一批的数据）
+//            if (!monitorDataBatch.isEmpty()) {
+//                writeData(client, monitorDataBatch);
+//            }
+//
+//        } catch (IOException e) {
+//            log.error("Error reading data from file: " + filePath, e);
+//        }
+//    }
+//
+//    public static MonitorData parseLineToMonitorData(String line) {
+//        // 示例数据格式: sensor_data,decoder=1,channel=Ch1 value=1538.46 1720713600000000000
+//        String[] parts = line.split(" ");  // 按空格分割
+//        String sensorData = parts[0]; // "sensor_data,decoder=1,channel=Ch1"
+//        String valueStr = parts[1]; // "value=1538.46"
+//        String timestampStr = parts[2]; // "1720713600000000000" 时间戳
+//
+//        // 解析时间戳
+//        long epochNano = Long.parseLong(timestampStr);
+//        long epochSecond = epochNano / 1_000_000_000; // 获取秒部分
+//        int nanoAdjustment = (int) (epochNano % 1_000_000_000); // 获取纳秒部分
+//
+//        Instant timestamp = Instant.ofEpochSecond(epochSecond, nanoAdjustment);
+//
+//        // 解析传感器数据部分
+//        String[] sensorDataParts = sensorData.split(",");
+//        String decoderId = sensorDataParts[1].split("=")[1]; // 解析 decoderId
+//        String channelId = sensorDataParts[2].split("=")[1]; // 解析 channelId
+//
+//        // 使用 Double 解析原始值
+//        String value = valueStr.split("=")[1]; // 提取 value=1538.46 后的数值部分
+//        double originalValue = Double.parseDouble(value); // 解析为 double 类型
+//
+//        // 创建 MonitorData 对象并返回
+//        return new MonitorData()
+//                .setDecoderId(decoderId)
+//                .setChannelId(channelId)
+//                .setLocationTime(timestamp)
+//                .setOriginalValue(originalValue)
+//                .setActualValue(originalValue); // 实际值可以根据需求设定
+//    }
+//
+//    public static void processAndWriteFile(String filePath, WriteApiBlocking writeApiBlocking) throws IOException {
+//        String influxDbOrg = "test";
+//        String influxDbBucket = "test2";
+//        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+//            String line;
+//            List<String> batch = new ArrayList<>();
+//            int processedLines = 0;
+//            int batchCount = 0;
+//
+//            long totalStartTime = System.nanoTime(); // 记录总处理时间
+//
+//            while ((line = reader.readLine()) != null) {
+//                // 跳过非数据行
+//                if (line.startsWith("W")) {
+//                    continue;
+//                }
+//
+//                // 解析数据行为Line Protocol格式
+//                String lineProtocol = parseLineToMonitorData0(line);
+//
+//                // 添加到批处理列表
+//                batch.add(lineProtocol);
+//                processedLines++;
+//
+//                // 每达到 BATCH_SIZE，就写入一次数据库
+//                if (batch.size() >= BATCH_SIZE) {
+//                    long batchStartTime = System.nanoTime(); // 记录每批次写入开始时间
+//                    writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batch));
+//                    long batchEndTime = System.nanoTime(); // 记录每批次写入结束时间
+//
+//                    // 打印每批次写入时间
+//                    long batchDuration = (batchEndTime - batchStartTime) / 1_000_000; // 毫秒
+//                    System.out.println("Batch " + (batchCount + 1) + " 写入数据库: " + batch.size() + " 条数据, 花费时间: " + batchDuration + "ms");
+//
+//                    batch.clear(); // 清空批次
+//                    batchCount++; // 增加批次计数
+//
+//                    // 如果已经处理了10000行数据，停止程序
+//                    if (processedLines >= 10000) {
+//                        System.out.println("已处理 10000 行数据，停止程序。");
+//                        break;
+//                    }
+//                }
+//            }
+//
+//            // 如果文件处理完剩余的数据还没有写入，进行一次写入
+//            if (!batch.isEmpty()) {
+//                long batchStartTime = System.nanoTime(); // 记录剩余批次的写入开始时间
+//                writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batch));
+//                long batchEndTime = System.nanoTime(); // 记录剩余批次的写入结束时间
+//
+//                // 打印剩余批次写入时间
+//                long batchDuration = (batchEndTime - batchStartTime) / 1_000_000; // 毫秒
+//                System.out.println("最后 Batch 写入数据库: " + batch.size() + " 条数据, 花费时间: " + batchDuration + "ms");
+//            }
+//
+//            long totalEndTime = System.nanoTime(); // 记录总处理时间结束
+//            long totalDuration = (totalEndTime - totalStartTime) / 1_000_000; // 毫秒
+//            System.out.println("总处理时间: " + totalDuration + "ms");
+//        }
+//    }
+//
+//    private static String parseLineToMonitorData0(String line) {
+//        // 假设每行的数据格式为：sensor_data,decoder=1,channel=Ch1 value=1538.46 1720713600000000000
+//        String[] parts = line.split("\\s+");
+//        if (parts.length < 2) {
+//            return null;
+//        }
+//
+//        String[] channelParts = parts[0].split(",");
+//        String channel = channelParts[2].split("=")[1];
+//
+//        String value = parts[1].split("=")[1];
+//        String timestampStr = parts[2];
+//
+//        // 转换为Line Protocol格式
+//        return String.format("sensor_data,decoder=1,channel=ch%s value=%s %s", channel, value, timestampStr);
+//    }
+//
+    public static void writeDataFromFile1(InfluxDBClient client, String filePath) throws IOException {
+    WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
+    BufferedReader reader = new BufferedReader(new FileReader(filePath));
+    String line;
+    Map<String, Integer> timeCounts = new HashMap<>(); // 记录每个时间点的计数
+    int processedLines = 0;
+    int batchCount = 0;
+    long startTime = System.currentTimeMillis(); // 记录开始时间
+    List<String> batchLines = new ArrayList<>(BATCH_SIZE);
 
-        // 按照批次拆分数据并写入
-        List<MonitorData> batch = new ArrayList<>();
-        for (int i = 0; i < monitorData.size(); i++) {
-            batch.add(monitorData.get(i));
+    // 从文件路径中提取解调器编号
+    String decoderId = filePath.split("\\\\")[2]; // 例如：从 "E:\\decoder\\01\\Wave_20240712_010000.txt" 中提取 "01"
+    int decoderNumber = Integer.parseInt(decoderId); // 转换为整数
 
-            // 当批次大小达到设定值时，执行写入操作
-            if (batch.size() >= BATCH_SIZE || i == monitorData.size() - 1) {
-                // 写入当前批次的数据
-                writeApiBlocking.writeMeasurements("test2", "test", WritePrecision.NS, batch);
-                log.info("Batch {} written successfully, size: {}", i / BATCH_SIZE + 1, batch.size());
+    // 跳过文件的第一行表头
+    reader.readLine();
 
-                // 清空批次
-                batch.clear();
+    // 读取文件并处理
+    while ((line = reader.readLine()) != null) {
+        String[] columns = line.split("\t");
+        if (columns.length < 4) {
+            continue;
+        }
+
+        String baseTime = columns[2].trim(); // 基准时间
+        int counter = timeCounts.getOrDefault(baseTime, 0); // 当前时间点的计数
+
+        // 如果当前时间点的数据量已经达到 1000 条，则跳过
+        if (counter >= 1000) {
+            continue;
+        }
+
+        timeCounts.put(baseTime, counter + 1); // 更新计数器
+
+        // 转换基准时间为纳秒时间戳
+        long timestampNs = convertTimestamp(baseTime, counter, 1000); // 采样频率为 1000Hz
+
+        // 提取 32 个信道的原始值
+        double[] originalValues = new double[32];
+        for (int i = 3; i < columns.length && (i - 3) / 3 < 32; i += 3) { // 每隔3列取一个信道
+            String value = columns[i].replace("|", "").trim();
+
+            // 如果值为空或仅包含竖线或空格，则跳过该信道
+            if (value.isEmpty() || value.equals("|") || value.equals(" ")) {
+                originalValues[(i - 3) / 3] = 0.0; // 默认值为 0.0
+                continue;
+            }
+
+            try {
+                originalValues[(i - 3) / 3] = Double.parseDouble(value); // 提取原始值
+            } catch (NumberFormatException e) {
+                // 如果数据无法解析为数字，则跳过该信道
+                originalValues[(i - 3) / 3] = 0.0; // 默认值为 0.0
+                continue;
             }
         }
 
-        log.info("All data written successfully to InfluxDB.");
-    }
+        // 计算实际值
+        double[] actualValues = Calculator.calculate(originalValues, decoderNumber);
 
+        // 创建一个 StringBuilder 来构建包含所有信道数据的行协议
+        StringBuilder lineProtocolBuilder = new StringBuilder();
+        lineProtocolBuilder.append(String.format("sensor_data,decoder=%d ", decoderNumber)); // 设置解调器编号
 
-    public static List<MonitorData> generateTestData() {
-        // 创建模拟的传感器数据
-        List<MonitorData> monitorDataList = new ArrayList<>();
-
-        // 获取当前时间作为第一个时间戳
-        Instant time = Instant.now().minus(Duration.ofHours(2400));
-
-        // 随机数生成器，用于生成时间间隔
-        Random random = new Random();
-
-        // 创建 5 条模拟数据
-        for (int i = 0; i < 10000; i++) {
-            // 随机生成1到1000毫秒之间的时间间隔
-            long randomInterval = 1 + random.nextInt(10);
-
-            // 设置时间戳为当前时间 + 随机时间间隔
-            time = time.plusMillis(randomInterval);
-
-            // 创建 MonitorData 对象并设置值
-            MonitorData data = new MonitorData()
-                    .setDecoderId("1")   // 设置解调器ID
-                    .setChannelId("ch1")   // 设置信道ID
-                    .setLocationTime(time)  // 设置时间，间隔随机
-                    .setOriginalValue(Math.random() * 100)   // 随机生成原始值
-                    .setActualValue(Math.random() * 100);    // 随机生成实际值
-
-            // 添加到数据列表
-            monitorDataList.add(data);
+        // 处理每个信道的数据
+        for (int channel = 0; channel < 32; channel++) {
+            lineProtocolBuilder.append(String.format("Ch%d_ori=%f,", channel + 1, originalValues[channel])); // 原始值
+            lineProtocolBuilder.append(String.format("Ch%d_act=%f,", channel + 1, actualValues[channel])); // 实际值
         }
 
-        return monitorDataList;
-    }
+        // 去掉最后一个逗号并添加时间戳
+        if (lineProtocolBuilder.length() > 0) {
+            lineProtocolBuilder.setLength(lineProtocolBuilder.length() - 1); // 去掉最后一个逗号
+            lineProtocolBuilder.append(String.format(" %d", timestampNs));
 
-    public static void readDataFromFileAndWrite(InfluxDBClient client, String filePath) {
-        List<MonitorData> monitorDataBatch = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(new File(filePath)))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                // 解析数据
-                MonitorData data = parseLineToMonitorData(line);
-                monitorDataBatch.add(data);
+            // 将行协议添加到批量中
+            batchLines.add(lineProtocolBuilder.toString());
+            processedLines++;
 
-                // 当批量数据达到指定大小时，写入 InfluxDB
-                if (monitorDataBatch.size() >= BATCH_SIZE) {
-                    writeData(client, monitorDataBatch);
-                    monitorDataBatch.clear();  // 清空批次数据
-                }
+            // 如果批量达到指定大小，写入数据库
+            if (batchLines.size() >= BATCH_SIZE) {
+                writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batchLines));
+                batchLines.clear(); // 清空批量数据
+
+                batchCount++;
+                long elapsedTime = System.currentTimeMillis() - startTime;
+                System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
+
             }
-
-            // 写入剩余的数据（不足一批的数据）
-            if (!monitorDataBatch.isEmpty()) {
-                writeData(client, monitorDataBatch);
-            }
-
-        } catch (IOException e) {
-            log.error("Error reading data from file: " + filePath, e);
         }
     }
 
-    public static MonitorData parseLineToMonitorData(String line) {
-        // 示例数据格式: sensor_data,decoder=1,channel=Ch1 value=1538.46 1720713600000000000
-        String[] parts = line.split(" ");  // 按空格分割
-        String sensorData = parts[0]; // "sensor_data,decoder=1,channel=Ch1"
-        String valueStr = parts[1]; // "value=1538.46"
-        String timestampStr = parts[2]; // "1720713600000000000" 时间戳
-
-        // 解析时间戳
-        long epochNano = Long.parseLong(timestampStr);
-        long epochSecond = epochNano / 1_000_000_000; // 获取秒部分
-        int nanoAdjustment = (int) (epochNano % 1_000_000_000); // 获取纳秒部分
-
-        Instant timestamp = Instant.ofEpochSecond(epochSecond, nanoAdjustment);
-
-        // 解析传感器数据部分
-        String[] sensorDataParts = sensorData.split(",");
-        String decoderId = sensorDataParts[1].split("=")[1]; // 解析 decoderId
-        String channelId = sensorDataParts[2].split("=")[1]; // 解析 channelId
-
-        // 使用 Double 解析原始值
-        String value = valueStr.split("=")[1]; // 提取 value=1538.46 后的数值部分
-        double originalValue = Double.parseDouble(value); // 解析为 double 类型
-
-        // 创建 MonitorData 对象并返回
-        return new MonitorData()
-                .setDecoderId(decoderId)
-                .setChannelId(channelId)
-                .setLocationTime(timestamp)
-                .setOriginalValue(originalValue)
-                .setActualValue(originalValue); // 实际值可以根据需求设定
+    // 处理剩余的批量数据
+    if (!batchLines.isEmpty()) {
+        writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batchLines));
+        batchCount++;
+        long elapsedTime = System.currentTimeMillis() - startTime;
+        System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
     }
 
-    public static void processAndWriteFile(String filePath, WriteApiBlocking writeApiBlocking) throws IOException {
-        String influxDbOrg = "test";
-        String influxDbBucket = "test2";
-        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
-            String line;
-            List<String> batch = new ArrayList<>();
-            int processedLines = 0;
-            int batchCount = 0;
+    reader.close();
+    System.out.println("数据写入完成，共处理 " + processedLines + " 条数据。");
+    return;
+}
 
-            long totalStartTime = System.nanoTime(); // 记录总处理时间
-
-            while ((line = reader.readLine()) != null) {
-                // 跳过非数据行
-                if (line.startsWith("W")) {
-                    continue;
-                }
-
-                // 解析数据行为Line Protocol格式
-                String lineProtocol = parseLineToMonitorData0(line);
-
-                // 添加到批处理列表
-                batch.add(lineProtocol);
-                processedLines++;
-
-                // 每达到 BATCH_SIZE，就写入一次数据库
-                if (batch.size() >= BATCH_SIZE) {
-                    long batchStartTime = System.nanoTime(); // 记录每批次写入开始时间
-                    writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batch));
-                    long batchEndTime = System.nanoTime(); // 记录每批次写入结束时间
-
-                    // 打印每批次写入时间
-                    long batchDuration = (batchEndTime - batchStartTime) / 1_000_000; // 毫秒
-                    System.out.println("Batch " + (batchCount + 1) + " 写入数据库: " + batch.size() + " 条数据, 花费时间: " + batchDuration + "ms");
-
-                    batch.clear(); // 清空批次
-                    batchCount++; // 增加批次计数
-
-                    // 如果已经处理了10000行数据，停止程序
-                    if (processedLines >= 10000) {
-                        System.out.println("已处理 10000 行数据，停止程序。");
-                        break;
-                    }
-                }
-            }
-
-            // 如果文件处理完剩余的数据还没有写入，进行一次写入
-            if (!batch.isEmpty()) {
-                long batchStartTime = System.nanoTime(); // 记录剩余批次的写入开始时间
-                writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batch));
-                long batchEndTime = System.nanoTime(); // 记录剩余批次的写入结束时间
-
-                // 打印剩余批次写入时间
-                long batchDuration = (batchEndTime - batchStartTime) / 1_000_000; // 毫秒
-                System.out.println("最后 Batch 写入数据库: " + batch.size() + " 条数据, 花费时间: " + batchDuration + "ms");
-            }
-
-            long totalEndTime = System.nanoTime(); // 记录总处理时间结束
-            long totalDuration = (totalEndTime - totalStartTime) / 1_000_000; // 毫秒
-            System.out.println("总处理时间: " + totalDuration + "ms");
-        }
-    }
-
-    private static String parseLineToMonitorData0(String line) {
-        // 假设每行的数据格式为：sensor_data,decoder=1,channel=Ch1 value=1538.46 1720713600000000000
-        String[] parts = line.split("\\s+");
-        if (parts.length < 2) {
-            return null;
-        }
-
-        String[] channelParts = parts[0].split(",");
-        String channel = channelParts[2].split("=")[1];
-
-        String value = parts[1].split("=")[1];
-        String timestampStr = parts[2];
-
-        // 转换为Line Protocol格式
-        return String.format("sensor_data,decoder=1,channel=ch%s value=%s %s", channel, value, timestampStr);
-    }
-
-    public static void writeDataFromFile(InfluxDBClient client, String filePath) throws IOException {
+    public static void writeDataFromFile2(InfluxDBClient client, String filePath) throws IOException {
         WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
         BufferedReader reader = new BufferedReader(new FileReader(filePath));
         String line;
@@ -226,8 +334,7 @@ public class DBUtilInsert {
         int processedLines = 0;
         int batchCount = 0;
         long startTime = System.currentTimeMillis(); // 记录开始时间
-        List<String> batchLines = new ArrayList<>(BATCH_SIZE);
-        List<String> batchLinesForFile = new ArrayList<>(BATCH_SIZE); // 用于写入文件的批量数据
+        List<Point> batchPoints = new ArrayList<>(BATCH_SIZE); // 用于批量写入的 Point 列表
 
         // 从文件路径中提取解调器编号
         String decoderId = filePath.split("\\\\")[2]; // 例如：从 "E:\\decoder\\01\\Wave_20240712_010000.txt" 中提取 "01"
@@ -256,76 +363,69 @@ public class DBUtilInsert {
             // 转换基准时间为纳秒时间戳
             long timestampNs = convertTimestamp(baseTime, counter, 1000); // 采样频率为 1000Hz
 
-            // 创建一个 StringBuilder 来构建包含所有信道数据的行协议
-            StringBuilder lineProtocolBuilder = new StringBuilder();
-            lineProtocolBuilder.append(String.format("sensor_data,decoder=%d ", decoderNumber)); // 设置解调器编号
-
-            // 处理每个信道的数据（从第4列开始，每隔3列取一个信道，共32个信道）
-            int validChannelCount = 0; // 有效信道的计数器
-            for (int i = 3; i < columns.length && validChannelCount < 32; i += 3) { // 每隔3列取一个信道
+            // 提取 32 个信道的原始值
+            double[] originalValues = new double[32];
+            for (int i = 3; i < columns.length && (i - 3) / 3 < 32; i += 3) { // 每隔3列取一个信道
                 String value = columns[i].replace("|", "").trim();
 
                 // 如果值为空或仅包含竖线或空格，则跳过该信道
                 if (value.isEmpty() || value.equals("|") || value.equals(" ")) {
+                    originalValues[(i - 3) / 3] = 0.0; // 默认值为 0.0
                     continue;
                 }
 
                 try {
-                    float floatValue = Float.parseFloat(value);
-                    validChannelCount++; // 只有有效值才会增加信道计数器
-                    lineProtocolBuilder.append(String.format("Ch%d=%f,", validChannelCount, floatValue)); // 信道编号从1开始
+                    originalValues[(i - 3) / 3] = Double.parseDouble(value); // 提取原始值
                 } catch (NumberFormatException e) {
                     // 如果数据无法解析为数字，则跳过该信道
+                    originalValues[(i - 3) / 3] = 0.0; // 默认值为 0.0
                     continue;
                 }
             }
 
-            // 去掉最后一个逗号并添加时间戳
-            if (lineProtocolBuilder.length() > 0) {
-                lineProtocolBuilder.setLength(lineProtocolBuilder.length() - 1); // 去掉最后一个逗号
-                lineProtocolBuilder.append(String.format(" %d", timestampNs));
+            // 计算实际值
+            double[] actualValues = Calculator.calculate(originalValues, decoderNumber); // 调用 calculate 函数
 
-                // 将行协议添加到批量中
-                batchLines.add(lineProtocolBuilder.toString());
-                batchLinesForFile.add(lineProtocolBuilder.toString());
+            // 创建 Point 对象并写入数据库
+            for (int channel = 0; channel < 32; channel++) {
+                Point point = Point.measurement("sensor_data")
+                        .addTag("decoder_id", decoderId) // 添加解调器编号标签
+                        .addTag("channel_id", "Ch" + (channel + 1)) // 添加信道编号标签
+                        .addField("originalValue", originalValues[channel]) // 添加原始值字段
+                        .addField("actualValue", actualValues[channel]) // 添加实际值字段
+                        .time(timestampNs, WritePrecision.NS); // 设置时间戳
 
+                // 将 Point 添加到批量中
+                batchPoints.add(point);
                 processedLines++;
 
-                // 如果批量达到指定大小，写入文件和数据库
-                if (batchLines.size() >= BATCH_SIZE) {
-                    // 写入数据库
-                    writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batchLines));
-
-                    batchLines.clear(); // 清空批量数据
-                    batchLinesForFile.clear(); // 清空写入文件的批量数据
+                // 如果批量达到指定大小，写入数据库
+                if (batchPoints.size() >= BATCH_SIZE) {
+                    writeApiBlocking.writePoints(influxDbBucket, influxDbOrg, batchPoints); // 批量写入
+                    batchPoints.clear(); // 清空批量数据
 
                     batchCount++;
                     long elapsedTime = System.currentTimeMillis() - startTime;
-                    System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
+                    System.out.println("已写入 " + batchCount * BATCH_SIZE / 32 + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
 
-                    // 如果处理了 10000000 条数据，停止程序
-                    if (processedLines >= 10000000) {
-                        System.out.println("已处理 10000000 条数据，程序中止！");
-                        reader.close();
-                        return; // 结束处理
-                    }
                 }
             }
         }
 
         // 处理剩余的批量数据
-        if (!batchLines.isEmpty()) {
-            // 写入数据库
-            writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batchLines));
+        if (!batchPoints.isEmpty()) {
+            writeApiBlocking.writePoints(influxDbBucket, influxDbOrg, batchPoints); // 批量写入
             batchCount++;
             long elapsedTime = System.currentTimeMillis() - startTime;
-            System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
+            System.out.println("已写入 " + batchCount * BATCH_SIZE / 32 + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
         }
 
         reader.close();
-        System.out.println("数据写入完成，共处理 " + processedLines + " 条数据。");
+        System.out.println("数据写入完成，共处理 " + processedLines / 32 + " 条数据。");
         return;
     }
+
+
 
     private static long convertTimestamp(String baseTime, int counter, int frequency) {
         try {
@@ -340,7 +440,60 @@ public class DBUtilInsert {
         }
     }
 
-    private static void writeBatchToFile(List<String> batchLines, String filePath) throws IOException {
+
+
+
+    public static void testsearch(InfluxDBClient client,String channelId,String decoderId){
+        QueryApi queryApi = client.getQueryApi();
+        Long time1 = System.currentTimeMillis();
+        int pageSize = 1000;
+        int offset = 0;
+
+        while (true) {
+            // 定义 Flux 查询（带分页）
+        String fluxQuery = "from(bucket: \"test2\") " +
+                "|> range(start: 1720713600,stop:1720713605) " +
+                "|> filter(fn: (r) => r._measurement == \"sensor_data\") " +
+                "|> filter(fn: (r) => r.channel_id == \"1\" and r.decoder_id == \"01\") " +
+                "|> filter(fn: (r) => r.decoder_id == \"01\") " +
+                "|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")" +
+                "|> limit(n: " + pageSize + ", offset: " + offset + ")";
+
+            // 查询数据
+            List<MonitorData> monitorDataList = queryApi.query(fluxQuery, MonitorData.class);
+
+            // 如果没有数据，退出循环
+            if (monitorDataList.isEmpty()) {
+                break;
+            }
+
+            // 打印当前页的数据
+            for (MonitorData data : monitorDataList) {
+                System.out.println(data);
+            }
+
+            // 更新 offset
+            offset += pageSize;
+        }
+        Long time2 = System.currentTimeMillis();
+        System.out.println((time2-time1)/1000.0);
+//        String fluxQuery = "from(bucket: \"test2\") " +
+//                "|> range(start: 1720713600,stop:1720713601) " +
+//                "|> filter(fn: (r) => r._measurement == \"sensor_data\") " +
+//                "|> filter(fn: (r) => r.channel_id == \"1\" and r.decoder_id == \"01\") " +
+//                "|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")" +
+//                "|> limit(n: " + pageSize + ", offset: " + offset + ")";
+//
+//        System.out.println(fluxQuery);
+//        Long time1 = System.currentTimeMillis();
+//        List<MonitorData> monitorData = queryApi.query(fluxQuery, MonitorData.class);
+//        Long time2 = System.currentTimeMillis();
+//        System.out.println(monitorData.size());
+//        System.out.println((time2-time1)/1000.0);
+        return;
+    }
+
+    private static void writeBatchToFile(List<String> batchLines) throws IOException {
         // 获取文件路径中的目录部分
         String outputFilePath = "E:\\decoder\\01\\0.txt";
 

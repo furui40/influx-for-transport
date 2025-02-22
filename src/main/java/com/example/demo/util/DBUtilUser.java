@@ -6,12 +6,9 @@ import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.QueryApi;
 import com.influxdb.client.domain.WritePrecision;
 import com.influxdb.client.write.Point;
-import com.influxdb.query.FluxRecord;
-import com.influxdb.query.FluxTable;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 public class DBUtilUser {
 
@@ -26,7 +23,7 @@ public class DBUtilUser {
         String fluxQuery = "from(bucket: \"test2\") " +
                 "|> range(start: 0) " +
                 "|> filter(fn: (r) => r._measurement == \"user_data\") " +
-                "|> filter(fn: (r) => r._field == \"user_name\" and r._value == \"" + userName + "\") ";
+                "|> filter(fn: (r) => r.user_name == \""+userName +"\" and r.password == \"" + password + "\") ";
 
         System.out.println(fluxQuery);
         // 执行查询，查看是否有重复用户名
@@ -51,8 +48,8 @@ public class DBUtilUser {
         // 创建并写入 Point 数据
         Point point = Point.measurement("user_data")
                 .addTag("user_id", newUser.getUserId())
-                .addField("user_name", newUser.getUserName())
-                .addField("password", newUser.getPassword())
+                .addTag("user_name", newUser.getUserName())
+                .addTag("password", newUser.getPassword())
                 .addField("user_status", newUser.getUserStatus())
                 .time(Instant.now(), WritePrecision.NS);
 
@@ -74,8 +71,7 @@ public class DBUtilUser {
         String fluxQuery1 = "from(bucket: \"test2\") " +
                 "|> range(start: 0) " +
                 "|> filter(fn: (r) => r._measurement == \"user_data\") " +
-                "|> filter(fn: (r) => r._field == \"user_name\" and r._value == \"" + userName + "\") ";
-
+                "|> filter(fn: (r) => r.user_name == \""+userName +"\" and r.password == \"" + password + "\") ";
         // 执行查询
         List<User> users = queryApi.query(fluxQuery1, User.class);
 
@@ -83,45 +79,46 @@ public class DBUtilUser {
         if (users.isEmpty()) {
             System.out.println("Invalid username");
             return CommonResult.failed("用户名不存在");
+        }else{
+            // 如果存在符合条件的用户，返回 user_id
+            String userId = users.get(0).getUserId();
+            return CommonResult.success(userId);
         }
 
-        // 如果存在符合条件的用户，返回 user_id
-        String userId = users.get(0).getUserId();
 
-        String fluxQuery2 = "from(bucket: \"test2\") " +
-                "|> range(start: 0) " +
-                "|> filter(fn: (r) => r._measurement == \"user_data\") " +
-                "|> filter(fn: (r) => r.user_id == \"" + userId + "\") ";
+//        String fluxQuery2 = "from(bucket: \"test2\") " +
+//                "|> range(start: 0) " +
+//                "|> filter(fn: (r) => r._measurement == \"user_data\") " +
+//                "|> filter(fn: (r) => r.user_id == \"" + userId + "\") ";
+//
+//        String temp_password = null;
+//        List<FluxTable> query = client.getQueryApi().query(fluxQuery2);
 
-        String temp_password = null;
-        List<FluxTable> query = client.getQueryApi().query(fluxQuery2);
-        for (FluxTable table : query) {
-            List<FluxRecord> records = table.getRecords();
-            for (FluxRecord record : records) {
-                Map<String, Object> values = record.getValues();
-
-                for (Map.Entry<String, Object> entry : values.entrySet()) {
-                    if (entry.getKey().startsWith("_field") || entry.getKey().startsWith("_value")) {
-                        Object fieldValue = entry.getValue();
-                        if (entry.getKey().startsWith("_value")) {
-                            temp_password = (String) fieldValue;
-                        }
-                        if (entry.getKey().startsWith("_field") && fieldValue.equals("password")) {
-                            if (temp_password.equals(password)) {
-                                System.out.println("Login successful for userId: " + userId);
-                                return CommonResult.success(userId);
-                            } else {
-                                System.out.println("Login failed: Wrong Password!");
-                                return CommonResult.failed("密码错误");
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        System.out.println("Login failed: Unknown Error");
-        return CommonResult.failed("未知错误");
+//        List<User> users1 = queryApi.query(fluxQuery2, User.class);
+//        for (FluxTable table : query) {
+//            List<FluxRecord> records = table.getRecords();
+//            for (FluxRecord record : records) {
+//                Map<String, Object> values = record.getValues();
+//
+//                for (Map.Entry<String, Object> entry : values.entrySet()) {
+//                    if (entry.getKey().startsWith("_field") || entry.getKey().startsWith("_value")) {
+//                        Object fieldValue = entry.getValue();
+//                        if (entry.getKey().startsWith("_value")) {
+//                            temp_password = (String) fieldValue;
+//                        }
+//                        if (entry.getKey().startsWith("_field") && fieldValue.equals("password")) {
+//                            if (temp_password.equals(password)) {
+//                                System.out.println("Login successful for userId: " + userId);
+//                                return CommonResult.success(userId);
+//                            } else {
+//                                System.out.println("Login failed: Wrong Password!");
+//                                return CommonResult.failed("密码错误");
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
     }
 }
 
