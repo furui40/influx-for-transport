@@ -1,6 +1,7 @@
 package com.example.demo;
 
 import com.example.demo.common.CommonResult;
+import com.example.demo.entity.MonitorData;
 import com.example.demo.entity.WeightData;
 import com.example.demo.resolver.DynamicWeighing;
 import com.example.demo.util.DBUtilInsert;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.example.demo.util.DBUtilInsert.writeDataFromFile2;
@@ -94,24 +96,40 @@ public class Test0 {
 //        System.out.println(loginResult.getMessage() + loginResult.getData());
 
 
-//        DataRevise.dataRevise(client, Instant.ofEpochSecond(1720749600L), Instant.ofEpochSecond(1720774800L));
-//        System.out.println("finished");
+        DataRevise.dataRevise(client, Instant.ofEpochSecond(1720749600L), Instant.ofEpochSecond(1720774800L));
+        System.out.println("finished");
+
 //        client.close();
 
 //        DataRevise2.dataRevise2(client, Instant.ofEpochSecond(1720749600L), Instant.ofEpochSecond(1720774800L));
 //        System.out.println("finished");
 //        client.close();
 
-//        DynamicWeighing.processFile(client,"E:\\data\\2024_season1_weight\\2024_season1_weight\\20231104.xlsx");
+//        DynamicWeighing.processFile(client,"E:\\data\\2024_season1_weight\\2024_season1_weight\\20240712.xlsx");
 //        System.out.println("finished");
 
-        Instant startTime = Instant.parse("2023-11-04T00:17:27.000Z");
-        Instant stopTime = Instant.parse("2023-11-04T14:28:37.000Z");
-        List<WeightData> weightDataList = DynamicWeighing.queryWeightData(client,startTime,stopTime);
-        // 打印查询结果
-        for (WeightData weightData : weightDataList) {
-            System.out.println(weightData);
-        }
+//        Instant startTime = Instant.parse("2024-07-11T20:49:52.000Z");
+//        Instant stopTime = Instant.parse("2024-07-12T20:49:52.000Z");
+//        List<WeightData> weightDataList = DynamicWeighing.queryWeightData(client,startTime,stopTime);
+//        // 打印查询结果
+//        for (WeightData weightData : weightDataList) {
+//            System.out.println(weightData);
+//        }
+
+        // 定义查询字段
+//        List<String> fields = Arrays.asList("1_Ch1_ori", "2_Ch2_act");
+//
+//        // 定义查询时间范围
+//        Long startTime = 1720749600L; // 2024-07-12T02:00:00Z
+//        Long stopTime = 1720749601L;  // 2024-07-12T02:00:01Z
+//
+//        // 执行查询
+//        List<MonitorData> result = DBUtilSearch.BaseQuery(client, fields, startTime, stopTime);
+//
+//        // 输出结果
+//        for (MonitorData data : result) {
+//            System.out.println(data);
+//        }
         client.close();
     }
 }

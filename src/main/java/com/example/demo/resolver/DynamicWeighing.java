@@ -57,15 +57,6 @@ public class DynamicWeighing {
                     String columnName = ItemMapping.COLUMN_MAPPING.get(sheet.getRow(0).getCell(cell.getColumnIndex()).getStringCellValue());
                     String cellValue = getCellValue(cell);
 
-                    // 对“方向”、“跨道”、“类型”三列进行值映射
-                    if (columnName.equals("direction") || columnName.equals("crossLane") || columnName.equals("type")) {
-                        cellValue = ItemMapping.VALUE_MAPPING.getOrDefault(cellValue, cellValue);
-                    }
-
-                    // 对“车型编号”和“车型”两列删除“型”和“类”字样
-                    if (columnName.equals("vehicleTypeCode") || columnName.equals("vehicleType")) {
-                        cellValue = cellValue.replace("型", "").replace("类", "");
-                    }
 
                     rowData.put(columnName, cellValue);
                 }

@@ -1,44 +1,30 @@
 package com.example.demo.entity;
 
-import com.influxdb.annotations.Column;
-import com.influxdb.annotations.Measurement;
-import lombok.Data;
-import lombok.experimental.Accessors;
-
 import java.time.Instant;
+import java.util.Map;
 
-@Data
-@Accessors(chain = true)
-@Measurement(name = "sensor_data")
 public class MonitorData {
+    private Instant time; // 时间戳
+    private Map<String, Double> fieldValues; // 字段值
 
-    /**
-     * 解调器id
-     */
-    @Column(name = "decoder_id", tag = true)
-    private String decoderId;
+    public MonitorData(Instant time, Map<String, Double> fieldValues) {
+        this.time = time;
+        this.fieldValues = fieldValues;
+    }
 
-    /**
-     * 信道id
-     */
-    @Column(name = "channel_id", tag = true)
-    private String channelId;
+    public Instant getTime() {
+        return time;
+    }
 
-    /**
-     * 时间
-     */
-    @Column(name = "_time", timestamp = true) // 映射到 _time 字段
-    private Instant locationTime;
+    public Map<String, Double> getFieldValues() {
+        return fieldValues;
+    }
 
-    /**
-     * 原始值
-     */
-    @Column(name = "originalValue") // 映射到 originalValue 字段
-    private double originalValue;
-
-    /**
-     * 实际值
-     */
-    @Column(name = "actualValue") // 映射到 actualValue 字段
-    private double actualValue;
+    @Override
+    public String toString() {
+        return "MonitorData{" +
+                "time=" + time +
+                ", fieldValues=" + fieldValues +
+                '}';
+    }
 }

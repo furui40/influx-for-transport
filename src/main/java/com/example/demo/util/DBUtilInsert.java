@@ -444,39 +444,39 @@ public class DBUtilInsert {
 
 
     public static void testsearch(InfluxDBClient client,String channelId,String decoderId){
-        QueryApi queryApi = client.getQueryApi();
-        Long time1 = System.currentTimeMillis();
-        int pageSize = 1000;
-        int offset = 0;
-
-        while (true) {
-            // 定义 Flux 查询（带分页）
-        String fluxQuery = "from(bucket: \"test2\") " +
-                "|> range(start: 1720713600,stop:1720713605) " +
-                "|> filter(fn: (r) => r._measurement == \"sensor_data\") " +
-                "|> filter(fn: (r) => r.channel_id == \"1\" and r.decoder_id == \"01\") " +
-                "|> filter(fn: (r) => r.decoder_id == \"01\") " +
-                "|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")" +
-                "|> limit(n: " + pageSize + ", offset: " + offset + ")";
-
-            // 查询数据
-            List<MonitorData> monitorDataList = queryApi.query(fluxQuery, MonitorData.class);
-
-            // 如果没有数据，退出循环
-            if (monitorDataList.isEmpty()) {
-                break;
-            }
-
-            // 打印当前页的数据
-            for (MonitorData data : monitorDataList) {
-                System.out.println(data);
-            }
-
-            // 更新 offset
-            offset += pageSize;
-        }
-        Long time2 = System.currentTimeMillis();
-        System.out.println((time2-time1)/1000.0);
+//        QueryApi queryApi = client.getQueryApi();
+//        Long time1 = System.currentTimeMillis();
+//        int pageSize = 1000;
+//        int offset = 0;
+//
+//        while (true) {
+//            // 定义 Flux 查询（带分页）
+//        String fluxQuery = "from(bucket: \"test2\") " +
+//                "|> range(start: 1720713600,stop:1720713605) " +
+//                "|> filter(fn: (r) => r._measurement == \"sensor_data\") " +
+//                "|> filter(fn: (r) => r.channel_id == \"1\" and r.decoder_id == \"01\") " +
+//                "|> filter(fn: (r) => r.decoder_id == \"01\") " +
+//                "|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")" +
+//                "|> limit(n: " + pageSize + ", offset: " + offset + ")";
+//
+//            // 查询数据
+//            List<MonitorData> monitorDataList = queryApi.query(fluxQuery, MonitorData.class);
+//
+//            // 如果没有数据，退出循环
+//            if (monitorDataList.isEmpty()) {
+//                break;
+//            }
+//
+//            // 打印当前页的数据
+//            for (MonitorData data : monitorDataList) {
+//                System.out.println(data);
+//            }
+//
+//            // 更新 offset
+//            offset += pageSize;
+//        }
+//        Long time2 = System.currentTimeMillis();
+//        System.out.println((time2-time1)/1000.0);
 //        String fluxQuery = "from(bucket: \"test2\") " +
 //                "|> range(start: 1720713600,stop:1720713601) " +
 //                "|> filter(fn: (r) => r._measurement == \"sensor_data\") " +

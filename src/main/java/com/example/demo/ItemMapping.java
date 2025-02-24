@@ -5,7 +5,6 @@ import java.util.Map;
 
 public class ItemMapping {
     public static final Map<String, String> COLUMN_MAPPING = new HashMap<>();
-    public static final Map<String, String> VALUE_MAPPING = new HashMap<>();
 
     static {
         // 列名映射
@@ -38,14 +37,5 @@ public class ItemMapping {
         COLUMN_MAPPING.put("轴3KN", "axle3Kn");
         COLUMN_MAPPING.put("偏移", "offset");
 
-        // 值映射
-        VALUE_MAPPING.put("正", "1");
-        VALUE_MAPPING.put("反", "0");
-        VALUE_MAPPING.put("是", "1");
-        VALUE_MAPPING.put("否", "0");
-        VALUE_MAPPING.put("小客", "0");
-        VALUE_MAPPING.put("大客", "1");
-        VALUE_MAPPING.put("小货", "2");
-        VALUE_MAPPING.put("大货", "3");
     }
 }

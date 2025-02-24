@@ -109,7 +109,7 @@ public class DataRevise {
         String[] parts = channelKey.split("_");
         String decoder = parts[0];
         String channel = parts[1];
-        String targetField = channel + "_rev";
+        String targetField = channel + "_rev1";
 
         // 获取当前信道参数
         SensorParams params = SensorParamsLoader.getParams(channelKey);
