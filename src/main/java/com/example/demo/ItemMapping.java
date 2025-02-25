@@ -8,6 +8,7 @@ public class ItemMapping {
 
     static {
         // 列名映射
+        // 动态称重
         COLUMN_MAPPING.put("编号", "id");
         COLUMN_MAPPING.put("时间", "timestamp");
         COLUMN_MAPPING.put("总重KG", "weightKg");
@@ -37,5 +38,24 @@ public class ItemMapping {
         COLUMN_MAPPING.put("轴3KN", "axle3Kn");
         COLUMN_MAPPING.put("偏移", "offset");
 
+        // 气象数据
+//        COLUMN_MAPPING.put("时间", "timestamp");
+        COLUMN_MAPPING.put("环温(℃)", "ambientTemperature");
+        COLUMN_MAPPING.put("温度1(℃)", "temperature1");
+        COLUMN_MAPPING.put("露点温度(℃)", "dewPointTemperature");
+        COLUMN_MAPPING.put("环湿(%RH)", "ambientHumidity");
+        COLUMN_MAPPING.put("气压(hPa)", "airPressure");
+        COLUMN_MAPPING.put("总辐射1瞬时(W/㎡)", "totalRadiation1Instant");
+        COLUMN_MAPPING.put("紫外辐射瞬时(W/㎡)", "UVRadiationInstant");
+        COLUMN_MAPPING.put("风向(°)", "windDirection");
+        COLUMN_MAPPING.put("瞬时风速(m/s)", "instantWindSpeed");
+        COLUMN_MAPPING.put("2分钟风速(m/s)", "windSpeed2Min");
+        COLUMN_MAPPING.put("10分钟风速(m/s)", "windSpeed10Min");
+        COLUMN_MAPPING.put("雨量间隔累计(mm)", "rainfallIntervalAccumulated");
+        COLUMN_MAPPING.put("雨量日累计(mm)", "rainfallDailyAccumulated");
+        COLUMN_MAPPING.put("总辐射1日累计(MJ/㎡)", "totalRadiation1DailyAccumulated");
+        COLUMN_MAPPING.put("紫外辐射日累计(MJ/㎡)", "UVRadiationDailyAccumulated");
+        COLUMN_MAPPING.put("光照度(KLux)", "illuminance");
+        COLUMN_MAPPING.put("电量(V)", "voltage");
     }
 }

@@ -8,7 +8,7 @@ import lombok.experimental.Accessors;
 @Data
 @Accessors(chain = true)
 @Measurement(name = "user_data")
-public class User {
+public class UserData {
 
     /**
      * 用户ID

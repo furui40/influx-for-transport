@@ -1,7 +1,7 @@
 package com.example.demo.util;
 
 import com.example.demo.common.CommonResult;
-import com.example.demo.entity.User;
+import com.example.demo.entity.UserData;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.QueryApi;
 import com.influxdb.client.domain.WritePrecision;
@@ -27,7 +27,7 @@ public class DBUtilUser {
 
         System.out.println(fluxQuery);
         // 执行查询，查看是否有重复用户名
-        List<User> existingUsers = queryApi.query(fluxQuery, User.class);
+        List<UserData> existingUsers = queryApi.query(fluxQuery, UserData.class);
 
         // 如果查询结果不为空，说明用户名已存在
         if (!existingUsers.isEmpty()) {
@@ -39,7 +39,7 @@ public class DBUtilUser {
         String userId = String.valueOf(Instant.now().toEpochMilli());
 
         // 创建一个用户实例
-        User newUser = new User()
+        UserData newUser = new UserData()
                 .setUserId(userId)
                 .setUserName(userName)
                 .setPassword(password)
@@ -73,7 +73,7 @@ public class DBUtilUser {
                 "|> filter(fn: (r) => r._measurement == \"user_data\") " +
                 "|> filter(fn: (r) => r.user_name == \""+userName +"\" and r.password == \"" + password + "\") ";
         // 执行查询
-        List<User> users = queryApi.query(fluxQuery1, User.class);
+        List<UserData> users = queryApi.query(fluxQuery1, UserData.class);
 
         // 判断是否找到符合条件的用户
         if (users.isEmpty()) {

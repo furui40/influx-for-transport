@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -153,11 +154,13 @@ public class DynamicWeighing {
         }
     }
 
-    public static List<WeightData> queryWeightData(InfluxDBClient client, Instant startTime, Instant stopTime) {
+
+    public static List<WeightData> queryWeightData(InfluxDBClient client, Long startTime, Long stopTime) {
         // 构建Flux查询语句
         String fluxQuery = String.format(
                 "from(bucket: \"test3\") " +
                         "|> range(start: %s, stop: %s) " +
+                        "|> filter(fn: (r) => r._measurement == \"weight_data\") " +
                         "|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")",
                 startTime.toString(), stopTime.toString()
         );
@@ -168,6 +171,14 @@ public class DynamicWeighing {
         // 执行查询并映射到WeightData对象
         List<WeightData> weightDataList = queryApi.query(fluxQuery, WeightData.class);
 
+        // 调整时间戳为东八区时间（即加上8小时）
+        weightDataList.forEach(weightData -> {
+            if (weightData.getTimestamp() != null) {
+                weightData.setTimestamp(weightData.getTimestamp().plus(Duration.ofHours(8)));
+            }
+        });
+
         return weightDataList;
     }
+
 }

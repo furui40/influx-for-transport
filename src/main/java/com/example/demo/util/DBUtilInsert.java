@@ -1,9 +1,6 @@
 package com.example.demo.util;
 
-import com.example.demo.entity.MonitorData;
-import com.example.demo.entity.User;
 import com.influxdb.client.InfluxDBClient;
-import com.influxdb.client.QueryApi;
 import com.influxdb.client.WriteApiBlocking;
 import com.influxdb.client.domain.WritePrecision;
 import com.influxdb.client.write.Point;
@@ -13,8 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.time.Duration;
-import java.time.Instant;
 
 @Slf4j
 public class DBUtilInsert {

@@ -2,8 +2,10 @@ package com.example.demo;
 
 import com.example.demo.common.CommonResult;
 import com.example.demo.entity.MonitorData;
+import com.example.demo.entity.WeatherData;
 import com.example.demo.entity.WeightData;
 import com.example.demo.resolver.DynamicWeighing;
+import com.example.demo.resolver.Weather;
 import com.example.demo.util.DBUtilInsert;
 import com.example.demo.util.DBUtilSearch;
 import com.example.demo.util.DBUtilUser;
@@ -44,11 +46,11 @@ public class Test0 {
     public void testInfluxDB() throws IOException {
         // 使用从配置文件中获取的值创建 InfluxDB 客户端
         InfluxDBClient client = InfluxDBClientFactory.create(influxDbUrl, influxDbToken.toCharArray(), influxDbOrg);
-
+        // 测试高频传感器查询
 //        DBUtilInsert.testsearch(client,"1","01");
 //        client.close();
 
-        // 解调器编号列表
+        // 批量写入高频传感器
 //        int[] decoderNumbers = {1, 2, 3, 4};
 //        String date = "20240712"; // 日期
 //        String basePath = "E:\\decoder"; // 基础路径
@@ -82,7 +84,7 @@ public class Test0 {
 //            // 关闭客户端连接
 //            client.close();
 //        }
-
+        // 完整查询
 //        String bucket = "test2";
 //        DBUtilSearch.BaseQuery(client,bucket, 1720713600L, 1720713601L,"sensor_data","value","Ch1","1",true);
 //        client.close();
@@ -95,41 +97,52 @@ public class Test0 {
 //        CommonResult loginResult = DBUtilUser.validateLogin(client, "123", "123");
 //        System.out.println(loginResult.getMessage() + loginResult.getData());
 
-
-        DataRevise.dataRevise(client, Instant.ofEpochSecond(1720749600L), Instant.ofEpochSecond(1720774800L));
-        System.out.println("finished");
+        // 跨解调器的土压力传感器数据修正
+//        DataRevise.dataRevise(client, Instant.ofEpochSecond(1720749600L), Instant.ofEpochSecond(1720774800L));
+//        System.out.println("finished");
 
 //        client.close();
-
+        // 多个初始值的主传感器数据修正
 //        DataRevise2.dataRevise2(client, Instant.ofEpochSecond(1720749600L), Instant.ofEpochSecond(1720774800L));
 //        System.out.println("finished");
 //        client.close();
 
+        // 动态称重数据写入
 //        DynamicWeighing.processFile(client,"E:\\data\\2024_season1_weight\\2024_season1_weight\\20240712.xlsx");
 //        System.out.println("finished");
 
-//        Instant startTime = Instant.parse("2024-07-11T20:49:52.000Z");
-//        Instant stopTime = Instant.parse("2024-07-12T20:49:52.000Z");
+        // 动态称重数据查询
+//        long startTime = Instant.parse("2024-07-11T20:00:00.000Z").toEpochMilli()/1000;
+//        long stopTime = Instant.parse("2024-07-12T10:00:00.000Z").toEpochMilli()/1000;
 //        List<WeightData> weightDataList = DynamicWeighing.queryWeightData(client,startTime,stopTime);
 //        // 打印查询结果
 //        for (WeightData weightData : weightDataList) {
 //            System.out.println(weightData);
 //        }
 
-        // 定义查询字段
+        // 新高频传感器数据查询
 //        List<String> fields = Arrays.asList("1_Ch1_ori", "2_Ch2_act");
-//
-//        // 定义查询时间范围
 //        Long startTime = 1720749600L; // 2024-07-12T02:00:00Z
 //        Long stopTime = 1720749601L;  // 2024-07-12T02:00:01Z
-//
-//        // 执行查询
 //        List<MonitorData> result = DBUtilSearch.BaseQuery(client, fields, startTime, stopTime);
-//
 //        // 输出结果
 //        for (MonitorData data : result) {
 //            System.out.println(data);
 //        }
+
+        // 气象数据写入
+//        Weather.processFile(client,"E:\\data\\Weather\\202407.xlsx");
+//        System.out.println("finished");
+
+        // 气象数据查询
+//        long startTime = Instant.parse("2024-07-12T00:00:00.000Z").toEpochMilli()/1000;
+//        long stopTime = Instant.parse("2024-07-13T00:00:00.000Z").toEpochMilli()/1000;
+//        List<WeatherData> weatherDataList = Weather.queryWeatherData(client,startTime,stopTime);
+//        // 打印查询结果
+//        for (WeatherData weatherData : weatherDataList) {
+//            System.out.println(weatherData);
+//        }
+
         client.close();
     }
 }
