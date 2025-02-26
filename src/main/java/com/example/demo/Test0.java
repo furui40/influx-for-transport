@@ -1,30 +1,18 @@
 package com.example.demo;
 
-import com.example.demo.common.CommonResult;
-import com.example.demo.entity.MonitorData;
-import com.example.demo.entity.WeatherData;
-import com.example.demo.entity.WeightData;
-import com.example.demo.resolver.DynamicWeighing;
-import com.example.demo.resolver.Weather;
-import com.example.demo.util.DBUtilInsert;
-import com.example.demo.util.DBUtilSearch;
-import com.example.demo.util.DBUtilUser;
-import com.example.demo.util.DataRevise;
-import com.example.demo.util.DataRevise2;
+import com.example.demo.entity.DownloadApply;
+import com.example.demo.service.DownloadService;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
-import com.influxdb.client.WriteApiBlocking;
+import com.influxdb.client.WriteApi;
+import com.influxdb.client.domain.WritePrecision;
+import com.influxdb.client.write.Point;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.List;
-
-import static com.example.demo.util.DBUtilInsert.writeDataFromFile2;
-import static com.example.demo.util.DBUtilInsert.writeDataFromFile1;
+import java.util.concurrent.ExecutionException;
 
 
 @Component
@@ -43,14 +31,14 @@ public class Test0 {
     @Value("${influxdb.bucket}")
     private String influxDbBucket;
 
-    public void testInfluxDB() throws IOException {
+    public void testInfluxDB() throws IOException, ExecutionException, InterruptedException {
         // 使用从配置文件中获取的值创建 InfluxDB 客户端
         InfluxDBClient client = InfluxDBClientFactory.create(influxDbUrl, influxDbToken.toCharArray(), influxDbOrg);
         // 测试高频传感器查询
 //        DBUtilInsert.testsearch(client,"1","01");
 //        client.close();
 
-        // 批量写入高频传感器
+//         批量写入高频传感器
 //        int[] decoderNumbers = {1, 2, 3, 4};
 //        String date = "20240712"; // 日期
 //        String basePath = "E:\\decoder"; // 基础路径
@@ -62,7 +50,7 @@ public class Test0 {
 //                String decoderPath = basePath + "\\" + decoderId; // 解调器路径
 //
 //                // 遍历 24 小时的数据文件
-//                for (int hour = 10; hour < 16; hour++) {
+//                for (int hour = 0; hour < 24; hour++) {
 //                    String hourStr = String.format("%02d0000", hour); // 格式化为小时，例如 "010000"
 //                    String filePath = decoderPath + "\\Wave_" + date + "_" + hourStr + ".txt"; // 文件路径
 //
@@ -84,6 +72,10 @@ public class Test0 {
 //            // 关闭客户端连接
 //            client.close();
 //        }
+
+//        testUtil.writeDataFromFile(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        client.close();
+
         // 完整查询
 //        String bucket = "test2";
 //        DBUtilSearch.BaseQuery(client,bucket, 1720713600L, 1720713601L,"sensor_data","value","Ch1","1",true);
@@ -142,6 +134,37 @@ public class Test0 {
 //        for (WeatherData weatherData : weatherDataList) {
 //            System.out.println(weatherData);
 //        }
+
+        // 测试修改
+//        DownloadApply apply = new DownloadApply()
+//                .setApplyId("1740568599042")
+//                .setDataType("高频传感器数据")
+//                .setFields("1111")
+//                .setStartTime("111111111111")
+//                .setStopTime("111111111112")
+//                .setUserEmail("userEmail")
+//                .setUserId("22222")
+//                .setStatus("已审核")
+//                .setMsg("已申请");
+//
+//        Point point = Point.measurement("apply_data")
+//                .addTag("apply_id", apply.getApplyId())
+//                .addField("status", apply.getStatus())
+//                .addTag("user_id", apply.getUserId())
+//                .addField("data_type", apply.getDataType())
+//                .addField("fields", apply.getFields())
+//                .addField("start_time", apply.getStartTime().toString())
+//                .addField("stop_time", apply.getStopTime().toString())
+//                .addField("user_email", apply.getUserEmail())
+//                .addField("msg",apply.getMsg())
+//                .time(Instant.parse("2024-07-12T00:00:00.000Z"), WritePrecision.NS); // 使用 applyId 作为时间戳
+//
+//        WriteApi writeApi = client.getWriteApi();
+//
+//        // 写入 InfluxDB
+//        writeApi.writePoint(influxDbBucket, influxDbOrg, point);
+
+//        DownloadService.passApply(client,"1740568599042");
 
         client.close();
     }

@@ -224,6 +224,9 @@ public class DBUtilInsert {
     int processedLines = 0;
     int batchCount = 0;
     long startTime = System.currentTimeMillis(); // 记录开始时间
+    long t0 = 0;
+    long t1 = 0;
+    long t2 = 0;
     List<String> batchLines = new ArrayList<>(BATCH_SIZE);
 
     // 从文件路径中提取解调器编号
@@ -235,6 +238,7 @@ public class DBUtilInsert {
 
     // 读取文件并处理
     while ((line = reader.readLine()) != null) {
+        long tn = System.currentTimeMillis();
         String[] columns = line.split("\t");
         if (columns.length < 4) {
             continue;
@@ -272,10 +276,12 @@ public class DBUtilInsert {
                 continue;
             }
         }
-
+        long tm = System.currentTimeMillis();
+        t0 = t0 + tm - tn;
         // 计算实际值
         double[] actualValues = Calculator.calculate(originalValues, decoderNumber);
-
+        tn = System.currentTimeMillis();
+        t1 = t1 + tn - tm;
         // 创建一个 StringBuilder 来构建包含所有信道数据的行协议
         StringBuilder lineProtocolBuilder = new StringBuilder();
         lineProtocolBuilder.append(String.format("sensor_data,decoder=%d ", decoderNumber)); // 设置解调器编号
@@ -285,7 +291,8 @@ public class DBUtilInsert {
             lineProtocolBuilder.append(String.format("Ch%d_ori=%f,", channel + 1, originalValues[channel])); // 原始值
             lineProtocolBuilder.append(String.format("Ch%d_act=%f,", channel + 1, actualValues[channel])); // 实际值
         }
-
+        tm = System.currentTimeMillis();
+        t2 = t2 + tm - tn;
         // 去掉最后一个逗号并添加时间戳
         if (lineProtocolBuilder.length() > 0) {
             lineProtocolBuilder.setLength(lineProtocolBuilder.length() - 1); // 去掉最后一个逗号
@@ -297,13 +304,16 @@ public class DBUtilInsert {
 
             // 如果批量达到指定大小，写入数据库
             if (batchLines.size() >= BATCH_SIZE) {
+                System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，读取拆分数据时间为：" + (t0 / 1000.0) + " 秒");
+                System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，计算实际值时间为：" + (t1 / 1000.0) + " 秒");
+                System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，拼接行协议时间为：" + (t2 / 1000.0) + " 秒");
+                System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，数据处理用时：" + ((System.currentTimeMillis() - startTime) / 1000.0) + " 秒");
                 writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batchLines));
                 batchLines.clear(); // 清空批量数据
 
                 batchCount++;
                 long elapsedTime = System.currentTimeMillis() - startTime;
                 System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
-
             }
         }
     }
@@ -319,7 +329,7 @@ public class DBUtilInsert {
     reader.close();
     System.out.println("数据写入完成，共处理 " + processedLines + " 条数据。");
     return;
-}
+    }
 
     public static void writeDataFromFile2(InfluxDBClient client, String filePath) throws IOException {
         WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();

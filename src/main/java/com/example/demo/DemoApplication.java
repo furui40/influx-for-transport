@@ -5,11 +5,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 
 @SpringBootApplication
 public class DemoApplication {
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
 		// 启动 Spring Boot 应用
 		ApplicationContext context = SpringApplication.run(DemoApplication.class, args);
 

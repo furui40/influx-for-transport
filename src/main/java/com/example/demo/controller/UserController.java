@@ -1,9 +1,10 @@
 package com.example.demo.controller;
 
 import com.example.demo.common.CommonResult;
-import com.example.demo.util.DBUtilUser;
+import com.example.demo.service.UserService;
 import com.example.demo.util.LogUtil;
 import com.influxdb.client.InfluxDBClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,13 +16,16 @@ public class UserController {
 
     private final InfluxDBClient influxDBClient;
 
-    public UserController(InfluxDBClient influxDBClient) {
+    private final UserService userService;
+
+    public UserController(InfluxDBClient influxDBClient,UserService userService) {
         this.influxDBClient = influxDBClient;
+        this.userService = userService;
     }
 
     @PostMapping("/login")
     public CommonResult<String> login(@RequestParam String username, @RequestParam String password) {
-        CommonResult<String> loginResult = DBUtilUser.validateLogin(influxDBClient, username, password);
+        CommonResult<String> loginResult = userService.validateLogin(influxDBClient, username, password);
 
         // 记录登录操作日志
         if (loginResult.getCode() == 200) {
@@ -35,7 +39,7 @@ public class UserController {
 
     @PostMapping("/register")
     public CommonResult<String> register(@RequestParam String username, @RequestParam String password) {
-        CommonResult<String> registerResult = DBUtilUser.registerUser(influxDBClient, username, password);
+        CommonResult<String> registerResult = userService.registerUser(influxDBClient, username, password);
 
         // 记录注册操作日志
         if (registerResult.getCode() == 200) {

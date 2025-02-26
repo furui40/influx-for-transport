@@ -4,8 +4,8 @@ import com.example.demo.common.CommonResult;
 import com.example.demo.entity.MonitorData;
 import com.example.demo.entity.WeatherData;
 import com.example.demo.entity.WeightData;
-import com.example.demo.resolver.DynamicWeighing;
-import com.example.demo.resolver.Weather;
+import com.example.demo.service.DynamicWeighingService;
+import com.example.demo.service.WeatherService;
 import com.example.demo.util.DBUtilSearch;
 import com.example.demo.util.LogUtil;
 import com.influxdb.client.InfluxDBClient;
@@ -52,9 +52,9 @@ public class SearchController {
             @RequestParam Long startTime,
             @RequestParam Long stopTime,
             @RequestParam String userId) {
-        DynamicWeighing dynamicWeighing = new DynamicWeighing();
+        DynamicWeighingService dynamicWeighingService = new DynamicWeighingService();
         try {
-            List<WeightData> result = dynamicWeighing.queryWeightData(influxDBClient, startTime, stopTime);
+            List<WeightData> result = dynamicWeighingService.queryWeightData(influxDBClient, startTime, stopTime);
 
             // 记录查询操作日志
             LogUtil.logOperation(userId, "QUERY", "DynamicWeighingSearch - Start: " + startTime + ", Stop: " + stopTime);
@@ -71,9 +71,9 @@ public class SearchController {
             @RequestParam Long startTime,
             @RequestParam Long stopTime,
             @RequestParam String userId) {
-        Weather weather = new Weather();
+        WeatherService weatherService = new WeatherService();
         try {
-            List<WeatherData> result = weather.queryWeatherData(influxDBClient, startTime, stopTime);
+            List<WeatherData> result = weatherService.queryWeatherData(influxDBClient, startTime, stopTime);
 
             // 记录查询操作日志
             LogUtil.logOperation(userId, "QUERY", "WeatherSearch - Start: " + startTime + ", Stop: " + stopTime);

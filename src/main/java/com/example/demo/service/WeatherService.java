@@ -1,4 +1,4 @@
-package com.example.demo.resolver;
+package com.example.demo.service;
 
 import com.example.demo.entity.WeatherData;
 import com.example.demo.ItemMapping;
@@ -12,6 +12,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -25,20 +26,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Service
 @Component
-public class Weather {
+public class WeatherService {
 
     private static String influxDbOrg;
     private static String influxDbBucket;
 
     @Value("${influxdb.org}")
     public void setInfluxDbOrg(String org) {
-        Weather.influxDbOrg = org;
+        WeatherService.influxDbOrg = org;
     }
 
     @Value("${influxdb.bucket}")
     public void setInfluxDbBucket(String bucket) {
-        Weather.influxDbBucket = bucket;
+        WeatherService.influxDbBucket = bucket;
     }
 
     public static void processFile(InfluxDBClient client, String filePath) {

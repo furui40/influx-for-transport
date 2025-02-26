@@ -1,4 +1,4 @@
-package com.example.demo.resolver;
+package com.example.demo.service;
 
 import com.example.demo.entity.WeightData;
 import com.example.demo.ItemMapping;
@@ -11,6 +11,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -25,19 +26,20 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class DynamicWeighing {
+@Service
+public class DynamicWeighingService {
 
     private static String influxDbOrg;
     private static String influxDbBucket;
 
     @Value("${influxdb.org}")
     public void setInfluxDbOrg(String org) {
-        DynamicWeighing.influxDbOrg = org;
+        DynamicWeighingService.influxDbOrg = org;
     }
 
     @Value("${influxdb.bucket}")
     public void setInfluxDbBucket(String bucket) {
-        DynamicWeighing.influxDbBucket = bucket;
+        DynamicWeighingService.influxDbBucket = bucket;
     }
 
     public static void processFile(InfluxDBClient client, String filePath) {

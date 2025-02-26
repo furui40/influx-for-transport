@@ -1,4 +1,4 @@
-package com.example.demo.util;
+package com.example.demo.service;
 
 import com.example.demo.common.CommonResult;
 import com.example.demo.entity.UserData;
@@ -6,11 +6,15 @@ import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.QueryApi;
 import com.influxdb.client.domain.WritePrecision;
 import com.influxdb.client.write.Point;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
 
-public class DBUtilUser {
+@Service
+@Component
+public class UserService {
 
     // 注册方法
     public static CommonResult<String> registerUser(InfluxDBClient client, String userName, String password) {
