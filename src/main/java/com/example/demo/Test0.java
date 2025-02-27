@@ -2,6 +2,7 @@ package com.example.demo;
 
 import com.example.demo.entity.DownloadApply;
 import com.example.demo.service.DownloadService;
+import com.example.demo.service.UserService;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
 import com.influxdb.client.WriteApi;
@@ -166,6 +167,8 @@ public class Test0 {
 
 //        DownloadService.passApply(client,"1740568599042");
 
+        // 修改密码功能
+//        UserService.modifyPassword(client, "1740650168866", "123","1234");
         client.close();
     }
 }

@@ -4,8 +4,10 @@ import com.example.demo.common.CommonResult;
 import com.example.demo.entity.UserData;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.QueryApi;
+import com.influxdb.client.domain.User;
 import com.influxdb.client.domain.WritePrecision;
 import com.influxdb.client.write.Point;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +17,19 @@ import java.util.List;
 @Service
 @Component
 public class UserService {
+    private static String influxDbOrg;
+    private static String influxDbBucket;
+
+    @Value("${influxdb.org}")
+    public void setInfluxDbOrg(String org) {
+        UserService.influxDbOrg = org;
+    }
+
+    @Value("${influxdb.bucket}")
+    public void setInfluxDbBucket(String bucket) {
+        UserService.influxDbBucket = bucket;
+    }
+
 
     // 注册方法
     public static CommonResult<String> registerUser(InfluxDBClient client, String userName, String password) {
@@ -24,10 +39,10 @@ public class UserService {
             return CommonResult.failed("用户名或密码为空");
         }
         QueryApi queryApi = client.getQueryApi();
-        String fluxQuery = "from(bucket: \"test2\") " +
+        String fluxQuery = "from(bucket: \"" + influxDbBucket +"\") " +
                 "|> range(start: 0) " +
                 "|> filter(fn: (r) => r._measurement == \"user_data\") " +
-                "|> filter(fn: (r) => r.user_name == \""+userName +"\" and r.password == \"" + password + "\") ";
+                "|> filter(fn: (r) => r.user_name == \""+userName +"\") ";
 
         System.out.println(fluxQuery);
         // 执行查询，查看是否有重复用户名
@@ -47,18 +62,18 @@ public class UserService {
                 .setUserId(userId)
                 .setUserName(userName)
                 .setPassword(password)
-                .setUserStatus("active");  // 默认设置为 active 状态
+                .setUserStatus("normal");  // 默认设置为普通用户
 
         // 创建并写入 Point 数据
         Point point = Point.measurement("user_data")
                 .addTag("user_id", newUser.getUserId())
                 .addTag("user_name", newUser.getUserName())
-                .addTag("password", newUser.getPassword())
-                .addField("user_status", newUser.getUserStatus())
+                .addField("password", newUser.getPassword())
+                .addTag("user_status", newUser.getUserStatus())
                 .time(Instant.now(), WritePrecision.NS);
 
         // 写入数据库
-        client.getWriteApiBlocking().writePoint("test2", "test", point);
+        client.getWriteApiBlocking().writePoint(influxDbBucket, influxDbOrg, point);
 
         // 返回注册成功的提示信息及userId
         return CommonResult.success(newUser.getUserId());
@@ -72,19 +87,24 @@ public class UserService {
             return CommonResult.failed("用户名或密码为空");
         }
         QueryApi queryApi = client.getQueryApi();
-        String fluxQuery1 = "from(bucket: \"test2\") " +
+        String flux = "from(bucket: \"" + influxDbBucket + "\") " +
                 "|> range(start: 0) " +
                 "|> filter(fn: (r) => r._measurement == \"user_data\") " +
-                "|> filter(fn: (r) => r.user_name == \""+userName +"\" and r.password == \"" + password + "\") ";
+                "|> filter(fn: (r) => r.user_name == \""+userName +"\" ) ";
         // 执行查询
-        List<UserData> users = queryApi.query(fluxQuery1, UserData.class);
+        List<UserData> users = queryApi.query(flux, UserData.class);
+
+//        System.out.println(flux);
 
         // 判断是否找到符合条件的用户
         if (users.isEmpty()) {
             System.out.println("Invalid username");
-            return CommonResult.failed("用户名不存在");
+            return CommonResult.failed("用户名或密码错误");
         }else{
             // 如果存在符合条件的用户，返回 user_id
+            for(UserData user : users){
+                System.out.println(user);
+            }
             String userId = users.get(0).getUserId();
             return CommonResult.success(userId);
         }
@@ -123,6 +143,44 @@ public class UserService {
 //                }
 //            }
 //        }
+    }
+
+    public static CommonResult<String> modifyPassword(InfluxDBClient client, String userId, String password, String newpassword) {
+        // 创建查询语句，检查用户名、密码是否匹配且用户状态为 active
+        if(userId.length() == 0 || password.length() == 0 || newpassword.length() == 0){
+            System.out.println("password is null.");
+            return CommonResult.failed("新密码或旧密码为空");
+        }
+        QueryApi queryApi = client.getQueryApi();
+        String fluxQuery1 = "from(bucket: \"" + influxDbBucket +"\") " +
+                "|> range(start: 0) " +
+                "|> filter(fn: (r) => r._measurement == \"user_data\") " +
+                "|> filter(fn: (r) => r.user_id == \""+ userId +"\" ) ";
+
+        System.out.println(fluxQuery1);
+        List<UserData> users = queryApi.query(fluxQuery1, UserData.class);
+
+        // 判断是否找到符合条件的用户
+        if (users.isEmpty()) {
+            System.out.println("Invalid username");
+            return CommonResult.failed("用户名错误");
+        }else{
+            if(users.size() == 1){
+                for(UserData user : users){
+                    System.out.println(user);
+                    if(user.getPassword().equals(password)){
+                        Point point = Point.measurement("user_data")
+                                .addTag("user_id", user.getUserId())
+                                .addTag("user_name", user.getUserName())
+                                .addField("password", newpassword)
+                                .addTag("user_status", user.getUserStatus())
+                                .time(user.getTimestamp(), WritePrecision.NS);
+                        client.getWriteApiBlocking().writePoint(influxDbBucket, influxDbOrg, point);
+                    }else return CommonResult.failed("密码错误");
+                }
+            }else return CommonResult.failed("未知错误1");
+            return CommonResult.success(userId);
+        }
     }
 }
 

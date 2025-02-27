@@ -3,3 +3,6 @@ influxdb:
   token: "PBOFaSOSOj-dRZ_uyvrv8-imu2kIIWjCOOxB_vKXOPs3ZHsuRK9iO7ZvPUKYwJvzunXKNeAo8LJ7rvx3P_qQkw=="
   org: "test"
   bucket: "test3"
+
+avatar:
+  upload-dir: ./uploads/avatars

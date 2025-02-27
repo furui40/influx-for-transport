@@ -5,6 +5,8 @@ import com.influxdb.annotations.Measurement;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
+import java.time.Instant;
+
 @Data
 @Accessors(chain = true)
 @Measurement(name = "user_data")
@@ -25,13 +27,15 @@ public class UserData {
     /**
      * 密码
      */
-    @Column(name = "password")
+    @Column(name = "_value")
     private String password;
 
     /**
-     * 用户状态（例如：active, inactive等）
+     * 用户状态（例如：admin,normal等）
      */
     @Column(name = "user_status")
     private String userStatus;
 
+    @Column(name = "_time")
+    private Instant timestamp;
 }

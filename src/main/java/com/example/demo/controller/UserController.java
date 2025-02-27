@@ -50,4 +50,18 @@ public class UserController {
 
         return registerResult;
     }
+
+    @PostMapping("/modifypassword")
+    public CommonResult<String> modifyPassword(@RequestParam String useId, @RequestParam String password,@RequestParam String newpassword) {
+        CommonResult<String> modifyResult = userService.modifyPassword(influxDBClient, useId, password,newpassword);
+
+        // 记录注册操作日志
+        if (modifyResult.getCode() == 200) {
+            LogUtil.logOperation(modifyResult.getData(), "MODIFY", "Modify Password successfully");
+        } else {
+            LogUtil.logOperation(useId, "MODIFY", modifyResult.getMessage());
+        }
+
+        return modifyResult;
+    }
 }
