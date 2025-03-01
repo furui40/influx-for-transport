@@ -227,6 +227,7 @@ public class DBUtilInsert {
     long t0 = 0;
     long t1 = 0;
     long t2 = 0;
+    long t3 = 0;
     List<String> batchLines = new ArrayList<>(BATCH_SIZE);
 
     // 从文件路径中提取解调器编号
@@ -307,12 +308,13 @@ public class DBUtilInsert {
                 System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，读取拆分数据时间为：" + (t0 / 1000.0) + " 秒");
                 System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，计算实际值时间为：" + (t1 / 1000.0) + " 秒");
                 System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，拼接行协议时间为：" + (t2 / 1000.0) + " 秒");
-                System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，数据处理用时：" + ((System.currentTimeMillis() - startTime) / 1000.0) + " 秒");
+                tn = System.currentTimeMillis();
                 writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batchLines));
                 batchLines.clear(); // 清空批量数据
-
+                t3 = t3 + System.currentTimeMillis() - tn;
                 batchCount++;
                 long elapsedTime = System.currentTimeMillis() - startTime;
+                System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，写入数据库时间为：" + (t3 / 1000.0) + " 秒");
                 System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
             }
         }

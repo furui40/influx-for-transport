@@ -1,7 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.entity.WeightData;
-import com.example.demo.ItemMapping;
+import com.example.demo.common.ItemMapping;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.QueryApi;
 import com.influxdb.client.WriteApiBlocking;
@@ -174,11 +174,11 @@ public class DynamicWeighingService {
         List<WeightData> weightDataList = queryApi.query(fluxQuery, WeightData.class);
 
         // 调整时间戳为东八区时间（即加上8小时）
-        weightDataList.forEach(weightData -> {
-            if (weightData.getTimestamp() != null) {
-                weightData.setTimestamp(weightData.getTimestamp().plus(Duration.ofHours(8)));
-            }
-        });
+//        weightDataList.forEach(weightData -> {
+//            if (weightData.getTimestamp() != null) {
+//                weightData.setTimestamp(weightData.getTimestamp().plus(Duration.ofHours(8)));
+//            }
+//        });
 
         return weightDataList;
     }

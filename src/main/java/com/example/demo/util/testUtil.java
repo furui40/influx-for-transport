@@ -18,8 +18,6 @@ public class testUtil {
     private static String influxDbBucket = "test2";
 
     public static final int BATCH_SIZE = 100000;
-    public static final int MAX_CHANNELS = 32; // 最大信道数量
-    private static final int SAMPLING_FREQUENCY_HZ = 1000; // 采样频率 (Hz)
 
     // 线程池配置
     private static final int THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors() * 2;
@@ -33,6 +31,7 @@ public class testUtil {
         int processedLines = 0;
         int batchCount = 0;
         long startTime = System.currentTimeMillis(); // 记录开始时间
+        long t1 = 0;
 
         // 使用 AtomicLong 替代普通变量
         AtomicLong totalReadTime = new AtomicLong(0); // 读取和拆分数据的总时间
@@ -40,7 +39,7 @@ public class testUtil {
         AtomicLong totalBuildProtocolTime = new AtomicLong(0); // 拼接行协议的总时间
 
         List<Future<List<String>>> futures = new ArrayList<>();
-
+        System.out.println("THREAD_POOL_SIZE : " + THREAD_POOL_SIZE);
         // 从文件路径中提取解调器编号
         String decoderId = filePath.split("\\\\")[2]; // 例如：从 "E:\\decoder\\01\\Wave_20240712_010000.txt" 中提取 "01"
         int decoderNumber = Integer.parseInt(decoderId); // 转换为整数
@@ -140,12 +139,15 @@ public class testUtil {
                 System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，计算实际值时间为：" + (totalCalculateTime.get() / 1000.0) + " 秒");
                 System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，拼接行协议时间为：" + (totalBuildProtocolTime.get() / 1000.0) + " 秒");
 
+                long tm = System.currentTimeMillis();
                 // 写入数据库
                 writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS, String.join("\n", batchLines));
                 batchLines.clear(); // 清空批量数据
 
                 batchCount++;
                 long elapsedTime = System.currentTimeMillis() - startTime;
+                t1 = t1 + System.currentTimeMillis() - tm;
+                System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，写入数据库用时：" + (t1 / 1000.0) + " 秒");
                 System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
 
                 futures.clear();

@@ -3,6 +3,7 @@ package com.example.demo;
 import com.example.demo.entity.DownloadApply;
 import com.example.demo.service.DownloadService;
 import com.example.demo.service.UserService;
+import com.example.demo.util.testUtil;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
 import com.influxdb.client.WriteApi;
@@ -11,9 +12,12 @@ import com.influxdb.client.write.Point;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.concurrent.ExecutionException;
+
+import static com.example.demo.util.DBUtilInsert.writeDataFromFile1;
 
 
 @Component
@@ -39,7 +43,7 @@ public class Test0 {
 //        DBUtilInsert.testsearch(client,"1","01");
 //        client.close();
 
-//         批量写入高频传感器
+         //批量写入高频传感器
 //        int[] decoderNumbers = {1, 2, 3, 4};
 //        String date = "20240712"; // 日期
 //        String basePath = "E:\\decoder"; // 基础路径
@@ -74,6 +78,7 @@ public class Test0 {
 //            client.close();
 //        }
 
+        //多线程写入
 //        testUtil.writeDataFromFile(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
 //        client.close();
 
@@ -136,7 +141,7 @@ public class Test0 {
 //            System.out.println(weatherData);
 //        }
 
-        // 测试修改
+        // 下载申请审核
 //        DownloadApply apply = new DownloadApply()
 //                .setApplyId("1740568599042")
 //                .setDataType("高频传感器数据")
@@ -162,9 +167,7 @@ public class Test0 {
 //
 //        WriteApi writeApi = client.getWriteApi();
 //
-//        // 写入 InfluxDB
 //        writeApi.writePoint(influxDbBucket, influxDbOrg, point);
-
 //        DownloadService.passApply(client,"1740568599042");
 
         // 修改密码功能

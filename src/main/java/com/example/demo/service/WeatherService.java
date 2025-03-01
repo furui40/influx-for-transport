@@ -1,7 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.entity.WeatherData;
-import com.example.demo.ItemMapping;
+import com.example.demo.common.ItemMapping;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.QueryApi;
 import com.influxdb.client.WriteApiBlocking;
