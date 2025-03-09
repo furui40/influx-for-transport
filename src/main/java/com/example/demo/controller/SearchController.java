@@ -32,10 +32,11 @@ public class SearchController {
             @RequestParam String fields,
             @RequestParam Long startTime,
             @RequestParam Long stopTime,
-            @RequestParam String userId) {
+            @RequestParam String userId,
+            @RequestParam Long samplingInterval ) {
         try {
             List<String> fieldList = Arrays.asList(fields.split(","));
-            List<MonitorData> result = DBUtilSearch.BaseQuery(influxDBClient, fieldList, startTime, stopTime);
+            List<MonitorData> result = DBUtilSearch.BaseQuery(influxDBClient, fieldList, startTime, stopTime,samplingInterval);
 
             // 记录查询操作日志
             LogUtil.logOperation(userId, "QUERY", "HighSensorSearch - Fields: " + fields + ", Start: " + startTime + ", Stop: " + stopTime);

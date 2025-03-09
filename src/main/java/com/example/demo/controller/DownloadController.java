@@ -5,6 +5,7 @@ import com.example.demo.entity.DownloadApply;
 import com.example.demo.service.DownloadService;
 import com.example.demo.util.LogUtil;
 import com.influxdb.client.InfluxDBClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;

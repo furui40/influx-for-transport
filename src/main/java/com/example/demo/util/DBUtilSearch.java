@@ -25,7 +25,7 @@ public class DBUtilSearch {
      * @return 查询结果列表
      */
     public static List<MonitorData> BaseQuery(InfluxDBClient client, List<String> fields,
-                                              Long startTime, Long stopTime) {
+                                              Long startTime, Long stopTime, Long samplingInterval) {
         // 构建 Flux 查询语句
         StringBuilder flux = new StringBuilder("from(bucket: \"test2\") ")
                 .append("|> range(start: ").append(startTime)
@@ -48,9 +48,8 @@ public class DBUtilSearch {
                 flux.append(" or ");
             }
         }
-
-        flux.append(") ")
-                .append("|> pivot(rowKey: [\"_time\"], columnKey: [\"decoder\", \"_field\"], valueColumn: \"_value\")");
+        flux.append(") ").append(" |> sample(n: ").append(samplingInterval).append(", pos: 0 )");
+        flux.append("|> pivot(rowKey: [\"_time\"], columnKey: [\"decoder\", \"_field\"], valueColumn: \"_value\")");
 
         System.out.println(flux);
 

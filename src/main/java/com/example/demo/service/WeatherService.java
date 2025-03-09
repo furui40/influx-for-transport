@@ -76,7 +76,7 @@ public class WeatherService {
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
                 // 将字符串解析为 LocalDateTime
                 LocalDateTime localDateTime = LocalDateTime.parse(rowData.get("timestamp"), formatter);
-                // 将 LocalDateTime 转换为 Instant，假设使用系统默认时区
+                // 将 LocalDateTime 转换为 Instant
                 Instant instant = localDateTime.atZone(ZoneId.systemDefault()).toInstant();
 
                 // 设置 WeatherData 对象
@@ -163,11 +163,11 @@ public class WeatherService {
         List<WeatherData> weatherDataList = queryApi.query(fluxQuery, WeatherData.class);
 
         // 调整时间戳为东八区时间（即加上8小时）
-        weatherDataList.forEach(weatherData -> {
-            if (weatherData.getTimestamp() != null) {
-                weatherData.setTimestamp(weatherData.getTimestamp().plus(Duration.ofHours(8)));
-            }
-        });
+//        weatherDataList.forEach(weatherData -> {
+//            if (weatherData.getTimestamp() != null) {
+//                weatherData.setTimestamp(weatherData.getTimestamp().plus(Duration.ofHours(8)));
+//            }
+//        });
 
         return weatherDataList;
     }
