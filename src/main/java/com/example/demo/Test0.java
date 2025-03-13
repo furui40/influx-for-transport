@@ -1,23 +1,17 @@
 package com.example.demo;
 
-import com.example.demo.entity.DownloadApply;
-import com.example.demo.service.DownloadService;
-import com.example.demo.service.UserService;
-import com.example.demo.util.testUtil;
+import com.example.demo.entity.SubsideData;
+import com.example.demo.service.SubsideService;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
-import com.influxdb.client.WriteApi;
-import com.influxdb.client.domain.WritePrecision;
-import com.influxdb.client.write.Point;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
-
-import static com.example.demo.util.DBUtilInsert.writeDataFromFile1;
 
 
 @Component
@@ -39,6 +33,8 @@ public class Test0 {
     public void testInfluxDB() throws IOException, ExecutionException, InterruptedException {
         // 使用从配置文件中获取的值创建 InfluxDB 客户端
         InfluxDBClient client = InfluxDBClientFactory.create(influxDbUrl, influxDbToken.toCharArray(), influxDbOrg);
+        Long time1 = System.currentTimeMillis();
+        System.out.println("started!");
         // 测试高频传感器查询
 //        DBUtilInsert.testsearch(client,"1","01");
 //        client.close();
@@ -172,6 +168,21 @@ public class Test0 {
 
         // 修改密码功能
 //        UserService.modifyPassword(client, "1740650168866", "123","1234");
+
+        // 沉降数据
+//        SubsideService.processFile(client,"E:\\data\\2024二三季度数据\\金玛\\沉降\\7.xlsx");
+        long startTime = Instant.parse("2024-07-12T00:00:00.000Z").toEpochMilli()/1000;
+        long stopTime = Instant.parse("2024-07-13T00:00:00.000Z").toEpochMilli()/1000;
+        List<String> fields = Arrays.asList("0034230033-01","0034230033-02") ;
+        List<SubsideData> subsideDataList = SubsideService.querySubsideData(client,startTime,stopTime,fields);
+        for(SubsideData subsideData:subsideDataList){
+            System.out.println(subsideData);
+        }
+
+
+        Long time2 = System.currentTimeMillis();
+        System.out.println("finished!");
+        System.out.println("用时：" + (time2-time1)/1000.0 + "秒");
         client.close();
     }
 }

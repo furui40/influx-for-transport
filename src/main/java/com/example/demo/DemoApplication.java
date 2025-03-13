@@ -15,7 +15,7 @@ public class DemoApplication {
 		ApplicationContext context = SpringApplication.run(DemoApplication.class, args);
 
 		// 获取 Test0 Bean 并执行测试
-//		Test0 test0 = context.getBean(Test0.class);
-//		test0.testInfluxDB();
+		Test0 test0 = context.getBean(Test0.class);
+		test0.testInfluxDB();
 	}
 }

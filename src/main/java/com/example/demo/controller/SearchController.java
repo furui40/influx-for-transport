@@ -2,12 +2,14 @@ package com.example.demo.controller;
 
 import com.example.demo.common.CommonResult;
 import com.example.demo.entity.MonitorData;
+import com.example.demo.entity.SubsideData;
 import com.example.demo.entity.WeatherData;
 import com.example.demo.entity.WeightData;
 import com.example.demo.service.DynamicWeighingService;
+import com.example.demo.service.SubsideService;
 import com.example.demo.service.WeatherService;
-import com.example.demo.util.DBUtilSearch;
-import com.example.demo.util.LogUtil;
+import com.example.demo.utils.DBUtilSearch;
+import com.example.demo.utils.LogUtil;
 import com.influxdb.client.InfluxDBClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -82,6 +84,27 @@ public class SearchController {
             return CommonResult.success(result);
         } catch (Exception e) {
             LogUtil.logOperation(userId, "QUERY", "WeatherSearch failed: " + e.getMessage());
+            return CommonResult.failed("查询失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/subside")
+    public CommonResult<List<SubsideData>> SubsideSearch(
+            @RequestParam String fields,
+            @RequestParam Long startTime,
+            @RequestParam Long stopTime,
+            @RequestParam String userId) {
+        SubsideService subsideService = new SubsideService();
+        try {
+            List<String> fieldList = Arrays.asList(fields.split(","));
+            List<SubsideData> result = subsideService.querySubsideData(influxDBClient, startTime, stopTime,fieldList);
+
+            // 记录查询操作日志
+            LogUtil.logOperation(userId, "QUERY", "SubsideSearch - Start: " + startTime + ", Stop: " + stopTime);
+
+            return CommonResult.success(result);
+        } catch (Exception e) {
+            LogUtil.logOperation(userId, "QUERY", "SubsideSearch failed: " + e.getMessage());
             return CommonResult.failed("查询失败: " + e.getMessage());
         }
     }

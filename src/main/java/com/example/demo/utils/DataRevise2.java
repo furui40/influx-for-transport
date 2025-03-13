@@ -1,4 +1,4 @@
-package com.example.demo.util;
+package com.example.demo.utils;
 
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.QueryApi;

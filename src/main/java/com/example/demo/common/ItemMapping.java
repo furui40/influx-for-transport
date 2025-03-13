@@ -57,5 +57,10 @@ public class ItemMapping {
         COLUMN_MAPPING.put("紫外辐射日累计(MJ/㎡)", "UVRadiationDailyAccumulated");
         COLUMN_MAPPING.put("光照度(KLux)", "illuminance");
         COLUMN_MAPPING.put("电量(V)", "voltage");
+
+        // 沉降数据
+        COLUMN_MAPPING.put("测点", "id");
+//        COLUMN_MAPPING.put("时间", "timestamp");
+        COLUMN_MAPPING.put("累计变化位移", "subside");
     }
 }

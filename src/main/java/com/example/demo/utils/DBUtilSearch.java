@@ -1,13 +1,11 @@
-package com.example.demo.util;
+package com.example.demo.utils;
 
 import com.example.demo.entity.MonitorData;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.query.FluxRecord;
 import com.influxdb.query.FluxTable;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.time.Period;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

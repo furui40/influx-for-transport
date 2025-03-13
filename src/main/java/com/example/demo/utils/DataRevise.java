@@ -1,9 +1,8 @@
-package com.example.demo.util;
+package com.example.demo.utils;
 
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.QueryApi;
 import com.influxdb.client.WriteApiBlocking;
-import com.influxdb.client.domain.Query;
 import com.influxdb.client.domain.WritePrecision;
 import com.influxdb.client.write.Point;
 import com.influxdb.query.FluxRecord;
