@@ -1,7 +1,7 @@
 package com.example.demo;
 
-import com.example.demo.entity.SubsideData;
-import com.example.demo.service.SubsideService;
+import com.example.demo.entity.JinMaData;
+import com.example.demo.service.JinMaDataService;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -169,15 +169,21 @@ public class Test0 {
         // 修改密码功能
 //        UserService.modifyPassword(client, "1740650168866", "123","1234");
 
-        // 沉降数据
-//        SubsideService.processFile(client,"E:\\data\\2024二三季度数据\\金玛\\沉降\\7.xlsx");
-        long startTime = Instant.parse("2024-07-12T00:00:00.000Z").toEpochMilli()/1000;
-        long stopTime = Instant.parse("2024-07-13T00:00:00.000Z").toEpochMilli()/1000;
-        List<String> fields = Arrays.asList("0034230033-01","0034230033-02") ;
-        List<SubsideData> subsideDataList = SubsideService.querySubsideData(client,startTime,stopTime,fields);
-        for(SubsideData subsideData:subsideDataList){
-            System.out.println(subsideData);
-        }
+        // 沉降,孔隙水压力
+//        JinMaDataService.processFile(client,"E:\\data\\2024二三季度数据\\金玛\\沉降\\7.xlsx","subside");
+//        JinMaDataService.processFile(client,"E:\\data\\2024二三季度数据\\金玛\\孔隙水压力\\7.xlsx","waterPressure");
+//        JinMaDataService.processFile(client,"E:\\data\\2024二三季度数据\\金玛\\温湿度\\7.xlsx","humiture");
+//        long startTime = Instant.parse("2024-07-12T00:00:00.000Z").toEpochMilli()/1000;
+//        long stopTime = Instant.parse("2024-07-13T00:00:00.000Z").toEpochMilli()/1000;
+//        List<String> fields = Arrays.asList("0034230033-01","0034230033-02") ; //沉降
+//        List<String> fields = Arrays.asList("0034230583-01","0034230583-02") ; //孔隙水压力
+//        List<String> fields = Arrays.asList("0034230034-01","0034230034-02") ; //温湿度
+//        List<JinMaData> jinMaDataList = JinMaDataService.queryJinMaData(client,startTime,stopTime,fields, "subside");//沉降
+//        List<JinMaData> jinMaDataList = JinMaDataService.queryJinMaData(client,startTime,stopTime,fields, "waterPressure");//孔隙水压力
+//        List<JinMaData> jinMaDataList = JinMaDataService.queryJinMaData(client,startTime,stopTime,fields, "humiture");//温湿度
+//        for(JinMaData jinMaData:jinMaDataList){
+//            System.out.println(jinMaData);
+//        }
 
 
         Long time2 = System.currentTimeMillis();

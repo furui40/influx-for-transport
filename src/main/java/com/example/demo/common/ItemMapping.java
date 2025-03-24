@@ -62,5 +62,16 @@ public class ItemMapping {
         COLUMN_MAPPING.put("测点", "id");
 //        COLUMN_MAPPING.put("时间", "timestamp");
         COLUMN_MAPPING.put("累计变化位移", "subside");
+
+        // 孔隙水压力数据
+//        COLUMN_MAPPING.put("测点", "id");
+//        COLUMN_MAPPING.put("时间", "timestamp");
+        COLUMN_MAPPING.put("累计变化压力", "waterPressure");
+
+        // 温湿度数据
+//        COLUMN_MAPPING.put("测点", "id");
+//        COLUMN_MAPPING.put("时间", "timestamp");
+        COLUMN_MAPPING.put("温度", "temperature");
+        COLUMN_MAPPING.put("湿度", "wet");
     }
 }

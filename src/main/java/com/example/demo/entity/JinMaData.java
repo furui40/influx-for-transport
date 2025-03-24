@@ -11,11 +11,9 @@ import java.util.Map;
 
 @Data
 @Accessors(chain = true)
-@Measurement(name = "subside_data")
-public class SubsideData {
+public class JinMaData {
     @Column(name = "_time", timestamp = true)
     private Instant timestamp;
 
-    // 存储多个测点的沉降数据
     private Map<String, Double> fieldValues = new HashMap<>();
 }

@@ -1,12 +1,12 @@
 package com.example.demo.controller;
 
 import com.example.demo.common.CommonResult;
+import com.example.demo.entity.JinMaData;
 import com.example.demo.entity.MonitorData;
-import com.example.demo.entity.SubsideData;
 import com.example.demo.entity.WeatherData;
 import com.example.demo.entity.WeightData;
 import com.example.demo.service.DynamicWeighingService;
-import com.example.demo.service.SubsideService;
+import com.example.demo.service.JinMaDataService;
 import com.example.demo.service.WeatherService;
 import com.example.demo.utils.DBUtilSearch;
 import com.example.demo.utils.LogUtil;
@@ -25,9 +25,13 @@ public class SearchController {
 
     private final InfluxDBClient influxDBClient;
 
-    public SearchController(InfluxDBClient influxDBClient) {
+    private final JinMaDataService jinMaDataService;
+
+    public SearchController(InfluxDBClient influxDBClient, JinMaDataService jinMaDataService) {
         this.influxDBClient = influxDBClient;
+        this.jinMaDataService = jinMaDataService;
     }
+
 
     @PostMapping("/high_sensor")
     public CommonResult<List<MonitorData>> HighSensorSearch(
@@ -89,15 +93,14 @@ public class SearchController {
     }
 
     @PostMapping("/subside")
-    public CommonResult<List<SubsideData>> SubsideSearch(
+    public CommonResult<List<JinMaData>> SubsideSearch(
             @RequestParam String fields,
             @RequestParam Long startTime,
             @RequestParam Long stopTime,
             @RequestParam String userId) {
-        SubsideService subsideService = new SubsideService();
         try {
             List<String> fieldList = Arrays.asList(fields.split(","));
-            List<SubsideData> result = subsideService.querySubsideData(influxDBClient, startTime, stopTime,fieldList);
+            List<JinMaData> result = jinMaDataService.queryJinMaData(influxDBClient,startTime, stopTime,fieldList, "subside");
 
             // 记录查询操作日志
             LogUtil.logOperation(userId, "QUERY", "SubsideSearch - Start: " + startTime + ", Stop: " + stopTime);
@@ -105,6 +108,46 @@ public class SearchController {
             return CommonResult.success(result);
         } catch (Exception e) {
             LogUtil.logOperation(userId, "QUERY", "SubsideSearch failed: " + e.getMessage());
+            return CommonResult.failed("查询失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/waterPressure")
+    public CommonResult<List<JinMaData>> WaterPressureSearch(
+            @RequestParam String fields,
+            @RequestParam Long startTime,
+            @RequestParam Long stopTime,
+            @RequestParam String userId) {
+        try {
+            List<String> fieldList = Arrays.asList(fields.split(","));
+            List<JinMaData> result = jinMaDataService.queryJinMaData(influxDBClient,startTime, stopTime,fieldList, "waterPressure");
+
+            // 记录查询操作日志
+            LogUtil.logOperation(userId, "QUERY", "WaterPressureSearch - Start: " + startTime + ", Stop: " + stopTime);
+
+            return CommonResult.success(result);
+        } catch (Exception e) {
+            LogUtil.logOperation(userId, "QUERY", "WaterPressureSearch failed: " + e.getMessage());
+            return CommonResult.failed("查询失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/humiture")
+    public CommonResult<List<JinMaData>> HumitureSearch(
+            @RequestParam String fields,
+            @RequestParam Long startTime,
+            @RequestParam Long stopTime,
+            @RequestParam String userId) {
+        try {
+            List<String> fieldList = Arrays.asList(fields.split(","));
+            List<JinMaData> result = jinMaDataService.queryJinMaData(influxDBClient,startTime, stopTime,fieldList, "humiture");
+
+            // 记录查询操作日志
+            LogUtil.logOperation(userId, "QUERY", "HumitureSearch - Start: " + startTime + ", Stop: " + stopTime);
+
+            return CommonResult.success(result);
+        } catch (Exception e) {
+            LogUtil.logOperation(userId, "QUERY", "HumitureSearch failed: " + e.getMessage());
             return CommonResult.failed("查询失败: " + e.getMessage());
         }
     }
