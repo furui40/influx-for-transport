@@ -94,9 +94,9 @@ public class DownloadService {
 
             // 执行查询
             List<DownloadApply> downloadApplyList = queryApi.query(fluxQuery,DownloadApply.class);
-            for(DownloadApply downloadApply : downloadApplyList){
-                System.out.println(downloadApply);
-            }
+//            for(DownloadApply downloadApply : downloadApplyList){
+//                System.out.println(downloadApply);
+//            }
             // 返回查询结果
             return CommonResult.success(downloadApplyList, "查询成功");
         } catch (Exception e) {

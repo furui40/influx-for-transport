@@ -49,7 +49,7 @@ public class DBUtilSearch {
         flux.append(") ").append(" |> sample(n: ").append(samplingInterval).append(", pos: 0 )");
         flux.append("|> pivot(rowKey: [\"_time\"], columnKey: [\"decoder\", \"_field\"], valueColumn: \"_value\")");
 
-        System.out.println(flux);
+//        System.out.println(flux);
 
         // 执行查询
         List<FluxTable> tables = client.getQueryApi().query(flux.toString());

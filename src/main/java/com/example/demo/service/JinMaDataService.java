@@ -164,7 +164,7 @@ public class JinMaDataService {
         }
 
 
-        System.out.println("Flux Query: " + fluxQuery);
+//        System.out.println("Flux Query: " + fluxQuery);
 
         QueryApi queryApi = client.getQueryApi();
         List<JinMaData> jinMaDataList = new ArrayList<>();
