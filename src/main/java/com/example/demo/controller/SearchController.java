@@ -7,14 +7,13 @@ import com.example.demo.entity.WeatherData;
 import com.example.demo.entity.WeightData;
 import com.example.demo.service.DynamicWeighingService;
 import com.example.demo.service.JinMaDataService;
+import com.example.demo.service.RedisService;
 import com.example.demo.service.WeatherService;
 import com.example.demo.utils.DBUtilSearch;
 import com.example.demo.utils.LogUtil;
 import com.influxdb.client.InfluxDBClient;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
 import java.util.List;
@@ -23,53 +22,75 @@ import java.util.List;
 @RequestMapping("/search")
 public class SearchController {
 
+
     private final InfluxDBClient influxDBClient;
 
     private final JinMaDataService jinMaDataService;
 
-    public SearchController(InfluxDBClient influxDBClient, JinMaDataService jinMaDataService) {
+    private final RedisService redisService;
+
+    public SearchController(InfluxDBClient influxDBClient, JinMaDataService jinMaDataService, RedisService redisService) {
         this.influxDBClient = influxDBClient;
         this.jinMaDataService = jinMaDataService;
+        this.redisService = redisService;
     }
 
 
     @PostMapping("/high_sensor")
-    public CommonResult<List<MonitorData>> HighSensorSearch(
+    public CommonResult<String> highSensorSearch(
             @RequestParam String fields,
             @RequestParam Long startTime,
             @RequestParam Long stopTime,
             @RequestParam String userId,
-            @RequestParam Long samplingInterval ) {
+            @RequestParam Long samplingInterval) {
+
         try {
+            // 先尝试从Redis获取
+            String querySignature = redisService.generateQuerySignature(fields, startTime, stopTime);
+            String existingQueryId = redisService.getExistingQueryId(querySignature);
+
+            if (existingQueryId != null) {
+                System.out.println("缓存命中");
+                LogUtil.logOperation(userId, "CACHE", "Reuse cached query: " + existingQueryId);
+                return CommonResult.success(existingQueryId);
+            }
+            System.out.println("缓存未命中");
+            // 需要查询数据库
             List<String> fieldList = Arrays.asList(fields.split(","));
-            List<MonitorData> result = DBUtilSearch.BaseQuery(influxDBClient, fieldList, startTime, stopTime,samplingInterval);
+            List<MonitorData> result = DBUtilSearch.BaseQuery(influxDBClient, fieldList,
+                    startTime, stopTime, samplingInterval);
 
-            // 记录查询操作日志
-            LogUtil.logOperation(userId, "QUERY", "HighSensorSearch - Fields: " + fields + ", Start: " + startTime + ", Stop: " + stopTime);
+            // 缓存结果
+            String queryId = redisService.cacheQueryResult(fields, startTime, stopTime, result);
 
-            return CommonResult.success(result);
+            LogUtil.logOperation(userId, "QUERY", "HighSensorSearch - Fields: " + fields +
+                    ", Start: " + startTime + ", Stop: " + stopTime);
+
+            return CommonResult.success(queryId);
         } catch (Exception e) {
             LogUtil.logOperation(userId, "QUERY", "HighSensorSearch failed: " + e.getMessage());
             return CommonResult.failed("查询失败: " + e.getMessage());
         }
     }
 
-    @PostMapping("/dynamicWeighing")
-    public CommonResult<List<WeightData>> DynamicWeighingSearch(
-            @RequestParam Long startTime,
-            @RequestParam Long stopTime,
+    @GetMapping("/query_result/{queryId}")
+    public CommonResult<List<MonitorData>> getQueryResult(
+            @PathVariable String queryId,
             @RequestParam String userId) {
-        DynamicWeighingService dynamicWeighingService = new DynamicWeighingService();
+
         try {
-            List<WeightData> result = dynamicWeighingService.queryWeightData(influxDBClient, startTime, stopTime);
+            List<MonitorData> result = redisService.getQueryResult(queryId);
 
-            // 记录查询操作日志
-            LogUtil.logOperation(userId, "QUERY", "DynamicWeighingSearch - Start: " + startTime + ", Stop: " + stopTime);
+            if (result == null) {
+                LogUtil.logOperation(userId, "CACHE", "Query result not found: " + queryId);
+                return CommonResult.failed("该查询编号不存在或者该查询结果已过期");
+            }
 
+            LogUtil.logOperation(userId, "FETCH", "Fetched query result: " + queryId);
             return CommonResult.success(result);
         } catch (Exception e) {
-            LogUtil.logOperation(userId, "QUERY", "DynamicWeighingSearch failed: " + e.getMessage());
-            return CommonResult.failed("查询失败: " + e.getMessage());
+            LogUtil.logOperation(userId, "FETCH", "Failed to fetch query result: " + e.getMessage());
+            return CommonResult.failed("获取查询结果失败: " + e.getMessage());
         }
     }
 

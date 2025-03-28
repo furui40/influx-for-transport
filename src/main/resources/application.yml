@@ -1,8 +1,42 @@
+# 应用基础配置
+spring:
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 30MB
+      max-request-size: 30MB
+  data:
+    # Redis 配置
+    redis:
+      host: localhost
+      port: 6379
+      password: 123456
+      database: 0
+      timeout: 3000
+
+# InfluxDB 配置
 influxdb:
   url: "http://localhost:8086"
   token: "PBOFaSOSOj-dRZ_uyvrv8-imu2kIIWjCOOxB_vKXOPs3ZHsuRK9iO7ZvPUKYwJvzunXKNeAo8LJ7rvx3P_qQkw=="
   org: "test"
   bucket: "test3"
 
+# 头像上传配置
 avatar:
   upload-dir: ./uploads/avatars
+
+# 自定义查询配置
+query:
+  cache:
+    prefix: "query:"  # Redis键前缀
+    expire-time: 1800 # 过期时间(秒)，30分钟=1800秒
+
+# 日志配置
+logging:
+  level:
+    root: info
+    com.example.demo: debug
+  file:
+    name: logs/application.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
