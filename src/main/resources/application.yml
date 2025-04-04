@@ -21,6 +21,22 @@ influxdb:
   org: "test"
   bucket: "test3"
 
+# 邮件配置
+mail:
+  host: smtp.qq.com
+  port: 587
+  username: 3338329165@qq.com
+  password: aumftytpsgdpcgjd
+  from: 3338329165@qq.com
+  properties:
+    smtp:
+      auth: true
+      starttls:
+        enable: true
+      ssl:
+        enable: true
+      timeout: 5000
+
 # 头像上传配置
 avatar:
   upload-dir: ./uploads/avatars

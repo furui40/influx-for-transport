@@ -12,6 +12,7 @@ import com.example.demo.service.WeatherService;
 import com.example.demo.utils.DBUtilSearch;
 import com.example.demo.utils.LogUtil;
 import com.influxdb.client.InfluxDBClient;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,21 +20,14 @@ import java.util.Arrays;
 import java.util.List;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/search")
 public class SearchController {
 
 
     private final InfluxDBClient influxDBClient;
-
     private final JinMaDataService jinMaDataService;
-
     private final RedisService redisService;
-
-    public SearchController(InfluxDBClient influxDBClient, JinMaDataService jinMaDataService, RedisService redisService) {
-        this.influxDBClient = influxDBClient;
-        this.jinMaDataService = jinMaDataService;
-        this.redisService = redisService;
-    }
 
 
     @PostMapping("/high_sensor")

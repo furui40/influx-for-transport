@@ -4,23 +4,21 @@ import com.example.demo.common.CommonResult;
 import com.example.demo.service.UserService;
 import com.example.demo.utils.LogUtil;
 import com.influxdb.client.InfluxDBClient;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/web")
 public class UserController {
 
     private final InfluxDBClient influxDBClient;
-
     private final UserService userService;
 
-    public UserController(InfluxDBClient influxDBClient,UserService userService) {
-        this.influxDBClient = influxDBClient;
-        this.userService = userService;
-    }
+
 
     @PostMapping("/login")
     public CommonResult<String> login(@RequestParam String username, @RequestParam String password) {

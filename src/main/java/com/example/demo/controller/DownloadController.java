@@ -5,6 +5,7 @@ import com.example.demo.entity.DownloadApply;
 import com.example.demo.service.DownloadService;
 import com.example.demo.utils.LogUtil;
 import com.influxdb.client.InfluxDBClient;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,16 +16,12 @@ import java.util.Arrays;
 import java.util.List;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/download")
 public class DownloadController {
     private final InfluxDBClient influxDBClient;
     private final DownloadService downloadService;
 
-    // 通过构造函数注入 InfluxDBClient 和 DownloadService
-    public DownloadController(InfluxDBClient influxDBClient, DownloadService downloadService) {
-        this.influxDBClient = influxDBClient;
-        this.downloadService = downloadService;
-    }
 
     @PostMapping("/newapply")
     public CommonResult<DownloadApply> newApply(

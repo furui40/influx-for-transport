@@ -4,12 +4,15 @@ import com.example.demo.entity.DownloadApply;
 import com.example.demo.common.CommonResult;
 import com.example.demo.common.ResultCode;
 import com.example.demo.entity.WeatherData;
+import com.example.demo.utils.MailUtils;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.QueryApi;
 import com.influxdb.client.WriteApi;
 import com.influxdb.client.domain.WritePrecision;
 import com.influxdb.client.write.Point;
 import com.influxdb.query.FluxTable;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +20,10 @@ import java.time.Instant;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class DownloadService {
+
+    private  final MailUtils mailUtils ;
 
     private static String influxDbOrg;
     private static String influxDbBucket;
@@ -63,6 +69,9 @@ public class DownloadService {
 
             // 写入 InfluxDB
             writeApi.writePoint(influxDbBucket, influxDbOrg, point);
+
+            // 发送邮件
+            mailUtils.sendApplicationEmail(apply.getUserEmail(), apply.getApplyId(), "submitted", null);
 
             // 返回成功响应
             return CommonResult.success(apply, "申请提交成功");
@@ -113,7 +122,7 @@ public class DownloadService {
      * @param Id  ID
      * @return Flux 查询语句
      */
-    private static String buildFluxQuery(String method, String Id) {
+    private String buildFluxQuery(String method, String Id) {
         StringBuilder fluxQuery = new StringBuilder();
         fluxQuery.append("from(bucket: \"" + influxDbBucket + "\") ")
                 .append("|> range(start: 0) ")
@@ -132,7 +141,7 @@ public class DownloadService {
         return fluxQuery.toString();
     }
 
-    public static CommonResult<?> passApply(InfluxDBClient client, String applyId) {
+    public CommonResult<?> passApply(InfluxDBClient client, String applyId) {
         if (client == null || applyId == null) {
             return CommonResult.validateFailed("参数不能为空");
         }
@@ -162,6 +171,7 @@ public class DownloadService {
                             .time(apply.getTimestamp(), WritePrecision.NS);
                     WriteApi writeApi = client.getWriteApi();
                     writeApi.writePoint(influxDbBucket, influxDbOrg, point);
+                    mailUtils.sendApplicationEmail(apply.getUserEmail(), apply.getApplyId(), "approved", null);
                 }
             }
             // 返回查询结果
@@ -172,7 +182,7 @@ public class DownloadService {
         }
     }
 
-    public static CommonResult<?> rejectApply(InfluxDBClient client, String applyId, String reason) {
+    public CommonResult<?> rejectApply(InfluxDBClient client, String applyId, String reason) {
         if (client == null || applyId == null) {
             return CommonResult.validateFailed("参数不能为空");
         }
@@ -202,6 +212,7 @@ public class DownloadService {
                             .time(apply.getTimestamp(), WritePrecision.NS);
                     WriteApi writeApi = client.getWriteApi();
                     writeApi.writePoint(influxDbBucket, influxDbOrg, point);
+                    mailUtils.sendApplicationEmail(apply.getUserEmail(), apply.getApplyId(), "rejected", reason);
                 }
             }
             // 返回查询结果
