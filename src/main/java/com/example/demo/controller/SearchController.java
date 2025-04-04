@@ -67,24 +67,22 @@ public class SearchController {
         }
     }
 
-    @GetMapping("/query_result/{queryId}")
-    public CommonResult<List<MonitorData>> getQueryResult(
-            @PathVariable String queryId,
+    @PostMapping("/dynamicWeighing")
+    public CommonResult<List<WeightData>> DynamicWeighingSearch(
+            @RequestParam Long startTime,
+            @RequestParam Long stopTime,
             @RequestParam String userId) {
-
+        DynamicWeighingService dynamicWeighingService = new DynamicWeighingService();
         try {
-            List<MonitorData> result = redisService.getQueryResult(queryId);
+            List<WeightData> result = dynamicWeighingService.queryWeightData(influxDBClient, startTime, stopTime);
 
-            if (result == null) {
-                LogUtil.logOperation(userId, "CACHE", "Query result not found: " + queryId);
-                return CommonResult.failed("该查询编号不存在或者该查询结果已过期");
-            }
+            // 记录查询操作日志
+            LogUtil.logOperation(userId, "QUERY", "DynamicWeighingSearch - Start: " + startTime + ", Stop: " + stopTime);
 
-            LogUtil.logOperation(userId, "FETCH", "Fetched query result: " + queryId);
             return CommonResult.success(result);
         } catch (Exception e) {
-            LogUtil.logOperation(userId, "FETCH", "Failed to fetch query result: " + e.getMessage());
-            return CommonResult.failed("获取查询结果失败: " + e.getMessage());
+            LogUtil.logOperation(userId, "QUERY", "DynamicWeighingSearch failed: " + e.getMessage());
+            return CommonResult.failed("查询失败: " + e.getMessage());
         }
     }
 
@@ -114,7 +112,7 @@ public class SearchController {
             @RequestParam Long stopTime,
             @RequestParam String userId) {
         try {
-            List<String> fieldList = Arrays.asList(fields.split(","));
+            List<String> fieldList = Arrays.asList(fields);
             List<JinMaData> result = jinMaDataService.queryJinMaData(influxDBClient,startTime, stopTime,fieldList, "subside");
 
             // 记录查询操作日志
@@ -164,6 +162,27 @@ public class SearchController {
         } catch (Exception e) {
             LogUtil.logOperation(userId, "QUERY", "HumitureSearch failed: " + e.getMessage());
             return CommonResult.failed("查询失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/query_result/{queryId}")
+    public CommonResult<List<MonitorData>> getQueryResult(
+            @PathVariable String queryId,
+            @RequestParam String userId) {
+
+        try {
+            List<MonitorData> result = redisService.getQueryResult(queryId);
+
+            if (result == null) {
+                LogUtil.logOperation(userId, "CACHE", "Query result not found: " + queryId);
+                return CommonResult.failed("该查询编号不存在或者该查询结果已过期");
+            }
+
+            LogUtil.logOperation(userId, "FETCH", "Fetched query result: " + queryId);
+            return CommonResult.success(result);
+        } catch (Exception e) {
+            LogUtil.logOperation(userId, "FETCH", "Failed to fetch query result: " + e.getMessage());
+            return CommonResult.failed("获取查询结果失败: " + e.getMessage());
         }
     }
 }

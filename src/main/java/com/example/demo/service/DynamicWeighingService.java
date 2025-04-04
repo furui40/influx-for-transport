@@ -229,13 +229,14 @@ public class DynamicWeighingService {
     public static List<WeightData> queryWeightData(InfluxDBClient client, Long startTime, Long stopTime) {
         // 构建Flux查询语句
         String fluxQuery = String.format(
-                "from(bucket: \"test3\") " +
+                "from(bucket: \"%s\") " +
                         "|> range(start: %s, stop: %s) " +
                         "|> filter(fn: (r) => r._measurement == \"weight_data\") " +
                         "|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")",
-                startTime.toString(), stopTime.toString()
+                influxDbBucket, startTime.toString(), stopTime.toString()
         );
 
+        System.out.println(fluxQuery);
         // 获取QueryApi
         QueryApi queryApi = client.getQueryApi();
 
