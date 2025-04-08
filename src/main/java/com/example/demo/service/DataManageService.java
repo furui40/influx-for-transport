@@ -23,27 +23,57 @@ public class DataManageService {
     @Value("${data.base-dir:/data}")
     private String baseDir;
 
+    @Value("${data.dynamicWeighing-dir}")
+    private String dynamicWeighingDir;
+
+    @Value("${data.weather-dir}")
+    private String weatherDir;
+
+    @Value("${data.subside-dir}")
+    private String subsideDir;
+
+    @Value("${data.waterPressure-dir}")
+    private String waterPressureDir;
+
+    @Value("${data.humiture-dir}")
+    private String humitureDir;
+
     public List<FileStatus> getOrCreateStatus(String dataType) throws IOException {
         Path statusFile = getStatusFilePath(dataType);
 
+        // 如果是weather数据类型，先执行xls转xlsx转换脚本
+        if ("weather".equals(dataType)) {
+            convertXlsToXlsx(weatherDir);
+        }
+
         if (!Files.exists(statusFile)) {
-            System.out.println("file not exists");
             return createStatusFile(dataType);
         }
 
-        return Files.readAllLines(statusFile).stream()
-                .map(line -> {
-                    String[] parts = line.split("\t");
-                    return new FileStatus(parts[0], "已写入".equals(parts[1]));
-                })
-                .collect(Collectors.toList());
+        Map<String, Boolean> existingStatus = loadStatusMap(statusFile);
+
+        List<FileStatus> currentFiles = scanFilesRecursively(dataType);
+
+        List<FileStatus> mergedStatus = new ArrayList<>();
+        for (FileStatus fileStatus : currentFiles) {
+            Boolean existingState = existingStatus.get(fileStatus.getFilePath());
+            mergedStatus.add(new FileStatus(
+                    fileStatus.getFilePath(),
+                    Boolean.TRUE.equals(existingState)
+            ));
+        }
+
+        // Save the merged status
+        saveStatusList(statusFile, mergedStatus);
+
+        return mergedStatus;
     }
+
 
     public void processFiles(InfluxDBClient influxDBClient, String dataType, List<String> filePaths) throws Exception {
         Path statusFile = getStatusFilePath(dataType);
         Map<String, Boolean> statusMap = loadStatusMap(statusFile);
 
-        // 处理文件
         for (String filePath : filePaths) {
             try {
                 processSingleFile(influxDBClient, dataType, filePath);
@@ -54,57 +84,81 @@ public class DataManageService {
             }
         }
 
-        // 更新状态
         saveStatusMap(statusFile, statusMap);
     }
 
     private void processSingleFile(InfluxDBClient influxDBClient, String dataType, String filePath) throws Exception {
+        // 由您自行处理具体文件处理逻辑
         switch (dataType) {
-            case "dynamic_weighing":
+            case "dynamicWeighing":
                 DynamicWeighingService.processFile(influxDBClient, filePath);
                 break;
-            // 添加其他数据类型处理
-            // case "temperature":
-            //     TemperatureService.processFile(influxDBClient, filePath);
-            //     break;
+            case "weather":
+                WeatherService.processFile(influxDBClient, filePath);
+                break;
+            case "subside":
+                JinMaDataService.processFile(influxDBClient, filePath,"subside");
+                break;
+            case "waterPressure":
+                JinMaDataService.processFile(influxDBClient, filePath,"waterPressure");
+                break;
+            case "humiture":
+                JinMaDataService.processFile(influxDBClient, filePath,"humiture");
+                break;
             default:
                 throw new IllegalArgumentException("不支持的数据类型: " + dataType);
         }
     }
 
     private Path getStatusFilePath(String dataType) {
-        System.out.println("baseDir:" + baseDir);
-        System.out.println("StatusFilePath: " + Paths.get(baseDir, dataType + "_status.txt"));
         return Paths.get(baseDir, dataType + "_status.txt");
     }
 
     private List<FileStatus> createStatusFile(String dataType) throws IOException {
-        // 使用双反斜杠或正斜杠处理Windows路径
-        Path dir = Paths.get("E:/data/2024二三季度动态称重/动态称重4-9");
-
-        System.out.println("createStatusFile:" + dir);
-        List<FileStatus> statusList = new ArrayList<>();
-
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir,
-                path -> !path.getFileName().toString().equals("status.txt"))) {
-            for (Path file : stream) {
-                statusList.add(new FileStatus(file.toString(), false));
-            }
-        }
-
-        // 写入状态文件（保存到./data/dynamic_weighing_status.txt）
-        List<String> lines = statusList.stream()
-                .map(fs -> fs.getFilePath() + "\t未写入")
-                .collect(Collectors.toList());
-
-        // 确保目标目录存在
+        List<FileStatus> statusList = scanFilesRecursively(dataType);
         Path statusFile = getStatusFilePath(dataType);
-        Files.createDirectories(statusFile.getParent());
-
-        Files.write(statusFile, lines, StandardCharsets.UTF_8);
+        saveStatusList(statusFile, statusList);
         return statusList;
     }
 
+    private List<FileStatus> scanFilesRecursively(String dataType) throws IOException {
+        String dataDir = getDataDirectory(dataType);
+        Path dir = Paths.get(dataDir);
+
+        List<FileStatus> statusList = new ArrayList<>();
+        scanDirectoryRecursively(dir, statusList);
+
+        return statusList;
+    }
+
+    private void scanDirectoryRecursively(Path directory, List<FileStatus> statusList) throws IOException {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory)) {
+            for (Path path : stream) {
+                if (Files.isDirectory(path)) {
+                    scanDirectoryRecursively(path, statusList);
+                } else if (!path.getFileName().toString().endsWith("_status.txt")) {
+                    statusList.add(new FileStatus(path.toString(), false));
+                }
+            }
+        }
+    }
+
+    private String getDataDirectory(String dataType) {
+        switch (dataType) {
+            case "dynamicWeighing":
+                return dynamicWeighingDir;
+            case "weather":
+                return weatherDir;
+            case "subside":
+                return subsideDir;
+            case "waterPressure":
+                return waterPressureDir;
+            case "humiture":
+                return humitureDir;
+            default:
+                throw new IllegalArgumentException("不支持的数据类型: " + dataType);
+        }
+    }
 
     private Map<String, Boolean> loadStatusMap(Path statusFile) throws IOException {
         if (!Files.exists(statusFile)) {
@@ -123,7 +177,32 @@ public class DataManageService {
                 .map(entry -> entry.getKey() + "\t" + (entry.getValue() ? "已写入" : "未写入"))
                 .collect(Collectors.toList());
 
-        Files.write(statusFile, lines);
+        Files.write(statusFile, lines, StandardCharsets.UTF_8);
     }
 
+    private void saveStatusList(Path statusFile, List<FileStatus> statusList) throws IOException {
+        List<String> lines = statusList.stream()
+                .map(fs -> fs.getFilePath() + "\t" + (fs.isProcessed() ? "已写入" : "未写入"))
+                .collect(Collectors.toList());
+
+        Files.createDirectories(statusFile.getParent());
+        Files.write(statusFile, lines, StandardCharsets.UTF_8);
+    }
+
+    // 新增方法：执行xls转xlsx的Python脚本
+    private void convertXlsToXlsx(String directory) throws IOException {
+        String pythonScript = "E:\\project\\Platform\\script\\XlsConvertToXlsx.py";
+        String[] command = new String[]{"python", pythonScript, directory};
+
+        try {
+            Process process = Runtime.getRuntime().exec(command);
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                throw new IOException("XLS to XLSX conversion failed with exit code: " + exitCode);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("XLS to XLSX conversion was interrupted", e);
+        }
+    }
 }

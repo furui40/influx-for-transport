@@ -15,7 +15,12 @@ spring:
       timeout: 3000
 
 data:
-  base-dir: ./data # 数据存储根目录
+  base-dir: ./data # 状态文件存储目录
+  dynamicWeighing-dir: E:/data/2024二三季度动态称重/动态称重4-9
+  weather-dir: E:/data/2024二三季度数据/气象xlsx
+  subside-dir: E:/data/2024二三季度数据/金玛/沉降
+  waterPressure-dir: E:/data/2024二三季度数据/金玛/孔隙水压力
+  humiture-dir: E:/data/2024二三季度数据/金玛/温湿度
 
 # InfluxDB 配置
 influxdb:

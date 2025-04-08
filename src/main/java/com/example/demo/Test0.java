@@ -2,6 +2,7 @@ package com.example.demo;
 
 import com.example.demo.entity.JinMaData;
 import com.example.demo.service.JinMaDataService;
+import com.example.demo.service.WeatherService;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -125,8 +126,7 @@ public class Test0 {
 //        }
 
         // 气象数据写入
-//        Weather.processFile(client,"E:\\data\\Weather\\202407.xlsx");
-//        System.out.println("finished");
+//        WeatherService.processFile(client,"E:\\data\\2024二三季度数据\\气象\\4\\4月.xlsx");
 
         // 气象数据查询
 //        long startTime = Instant.parse("2024-07-12T00:00:00.000Z").toEpochMilli()/1000;

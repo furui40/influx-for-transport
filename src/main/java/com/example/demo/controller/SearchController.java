@@ -112,7 +112,7 @@ public class SearchController {
             @RequestParam Long stopTime,
             @RequestParam String userId) {
         try {
-            List<String> fieldList = Arrays.asList(fields);
+            List<String> fieldList = Arrays.asList(fields.split(","));
             List<JinMaData> result = jinMaDataService.queryJinMaData(influxDBClient,startTime, stopTime,fieldList, "subside");
 
             // 记录查询操作日志
