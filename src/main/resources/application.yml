@@ -1,18 +1,19 @@
 # 应用基础配置
 spring:
-  # 文件上传配置
   servlet:
     multipart:
       max-file-size: 30MB
       max-request-size: 30MB
   data:
-    # Redis 配置
     redis:
       host: localhost
       port: 6379
       password: 123456
-      database: 0
+      database: 0  # 默认数据库
       timeout: 3000
+      upload-record:  # 上传记录专用配置
+        database: 1  # 使用1号数据库
+        expire-time: 2592000  # 30天过期
 
 data:
   base-dir: ./data # 状态文件存储目录

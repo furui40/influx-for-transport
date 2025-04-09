@@ -17,7 +17,7 @@ public class DataRevise {
 
     private static final int PAGE_SIZE_SECONDS = 100; // 分页大小（秒）
     private static final int BATCH_SIZE = 10000; // 批量写入大小
-    private static final String influxDbBucket = "test2";
+    private static final String influxDbBucket = "test6";
 
     private static final String influxDbOrg = "test";
 

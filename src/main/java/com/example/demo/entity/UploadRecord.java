@@ -5,8 +5,9 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class FileStatus {
+public class UploadRecord {
+    private String dataType;
     private String filePath;
-    private boolean processed;
+    private String status;
+    private Long timestamp;
 }
-

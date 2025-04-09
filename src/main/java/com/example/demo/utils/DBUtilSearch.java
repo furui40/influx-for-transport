@@ -25,7 +25,7 @@ public class DBUtilSearch {
     public static List<MonitorData> BaseQuery(InfluxDBClient client, List<String> fields,
                                               Long startTime, Long stopTime, Long samplingInterval) {
         // 构建 Flux 查询语句
-        StringBuilder flux = new StringBuilder("from(bucket: \"test2\") ")
+        StringBuilder flux = new StringBuilder("from(bucket: \"test6\") ")
                 .append("|> range(start: ").append(startTime)
                 .append(", stop: ").append(stopTime).append(") ")
                 .append("|> filter(fn: (r) => ");
