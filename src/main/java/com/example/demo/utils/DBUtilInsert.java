@@ -1,5 +1,6 @@
 package com.example.demo.utils;
 
+import com.example.demo.entity.CalculateResult;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.WriteApiBlocking;
 import com.influxdb.client.domain.WritePrecision;
@@ -279,18 +280,27 @@ public class DBUtilInsert {
             }
             long tm = System.currentTimeMillis();
             t0 = t0 + tm - tn;
-            // 计算实际值
-            double[] actualValues = Calculator.calculate(originalValues, decoderNumber);
+            // 计算实际值和修正值
+            CalculateResult result = Calculator.calculate(originalValues, decoderNumber);
+            double[] actualValues = result.getActualValues();
+            Map<String, Double> reviseValues = result.getReviseValues();
+
             tn = System.currentTimeMillis();
             t1 = t1 + tn - tm;
+
             // 创建一个 StringBuilder 来构建包含所有信道数据的行协议
             StringBuilder lineProtocolBuilder = new StringBuilder();
             lineProtocolBuilder.append(String.format("sensor_data,decoder=%d ", decoderNumber)); // 设置解调器编号
 
-            // 处理每个信道的数据
+            // 处理每个信道的原始值和实际值
             for (int channel = 0; channel < 32; channel++) {
                 lineProtocolBuilder.append(String.format("Ch%d_ori=%f,", channel + 1, originalValues[channel])); // 原始值
                 lineProtocolBuilder.append(String.format("Ch%d_act=%f,", channel + 1, actualValues[channel])); // 实际值
+            }
+
+            // 处理修正值
+            for (Map.Entry<String, Double> entry : reviseValues.entrySet()) {
+                lineProtocolBuilder.append(String.format("%s=%f,", entry.getKey(), entry.getValue()));
             }
             tm = System.currentTimeMillis();
             t2 = t2 + tm - tn;
@@ -391,7 +401,9 @@ public class DBUtilInsert {
             }
 
             // 计算实际值
-            double[] actualValues = Calculator.calculate(originalValues, decoderNumber); // 调用 calculate 函数
+            CalculateResult result = Calculator.calculate(originalValues, decoderNumber);
+            double[] actualValues = result.getActualValues();
+            Map<String, Double> reviseValues = result.getReviseValues();
 
             // 创建 Point 对象并写入数据库
             for (int channel = 0; channel < 32; channel++) {
