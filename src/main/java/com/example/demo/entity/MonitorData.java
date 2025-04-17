@@ -1,36 +1,30 @@
 package com.example.demo.entity;
 
+import java.time.Instant;
+import java.util.Map;
 
 public class MonitorData {
-    private String monitorDeviceCode;
-    private String value;
-    private String originalValue;
-    private DateTime time;
+    private Instant time; // 时间戳
+    private Map<String, Double> fieldValues; // 字段值
 
-    // Getters and setters
-
-    public String getMonitorDeviceCode() {
-        return monitorDeviceCode;
+    public MonitorData(Instant time, Map<String, Double> fieldValues) {
+        this.time = time;
+        this.fieldValues = fieldValues;
     }
 
-    public void setMonitorDeviceCode(String monitorDeviceCode) {
-        this.monitorDeviceCode = monitorDeviceCode;
-    }
-
-    public String getValue() {
-        return value;
-    }
-
-    public void setValue(String value) {
-        this.value = value;
-    }
-
-
-    public DateTime getTime() {
+    public Instant getTime() {
         return time;
     }
 
-    public void setTime(DateTime time) {
-        this.time = time;
+    public Map<String, Double> getFieldValues() {
+        return fieldValues;
+    }
+
+    @Override
+    public String toString() {
+        return "MonitorData{" +
+                "time=" + time +
+                ", fieldValues=" + fieldValues +
+                '}';
     }
 }

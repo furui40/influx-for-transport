@@ -1,14 +1,68 @@
+# 应用基础配置
 spring:
-  influx:
-    url: http://localhost:8086/
-    username: admin
-    password: 12345678
-    token: i_P6S7q6YtdDZtOcT4ZKsfCb-KnQZ25NIvJ3v3YfDNAPI4wWwca9BA8yP9AYUNvvXcQk6w7LjIqSUsF9aJC85Q==
-    org: test
-    bucket: test4
-#??influx??
-management:
-  metrics:
-    export:
-      influx:
-        enabled: false
+  servlet:
+    multipart:
+      max-file-size: 30MB
+      max-request-size: 30MB
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: 123456
+      database: 0  # 默认数据库
+      timeout: 3000
+      upload-record:  # 上传记录专用配置
+        database: 1  # 使用1号数据库
+        expire-time: 2592000  # 30天过期
+
+data:
+  base-dir: ./data # 状态文件存储目录
+  dynamicWeighing-dir: E:/data/2024二三季度动态称重/动态称重4-9
+  weather-dir: E:/data/2024二三季度数据/气象xlsx
+  subside-dir: E:/data/2024二三季度数据/金玛/沉降
+  waterPressure-dir: E:/data/2024二三季度数据/金玛/孔隙水压力
+  humiture-dir: E:/data/2024二三季度数据/金玛/温湿度
+  highSensor-dir: E:/decoder
+
+# InfluxDB 配置
+influxdb:
+  url: "http://localhost:8086"
+  token: "PBOFaSOSOj-dRZ_uyvrv8-imu2kIIWjCOOxB_vKXOPs3ZHsuRK9iO7ZvPUKYwJvzunXKNeAo8LJ7rvx3P_qQkw=="
+  org: "test"
+  bucket: "test4"
+
+# 邮件配置
+mail:
+  host: smtp.qq.com
+  port: 587
+  username: 3338329165@qq.com
+  password: aumftytpsgdpcgjd
+  from: 3338329165@qq.com
+  properties:
+    smtp:
+      auth: true
+      starttls:
+        enable: true
+      ssl:
+        enable: true
+      timeout: 5000
+
+# 头像上传配置
+avatar:
+  upload-dir: ./uploads/avatars
+
+# 自定义查询配置
+query:
+  cache:
+    prefix: "query:"  # Redis键前缀
+    expire-time: 86400 # 过期时间(秒)
+
+# 日志配置
+logging:
+  level:
+    root: info
+    com.example.demo: debug
+  file:
+    name: logs/application.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
