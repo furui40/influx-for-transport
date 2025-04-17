@@ -59,7 +59,6 @@ public class DBUtilSearch {
         for (FluxTable table : tables) {
             for (FluxRecord record : table.getRecords()) {
                 Instant time = (Instant) record.getValueByKey("_time");
-//                Instant localtime = time.plus(Duration.ofHours(8));
                 Map<String, Double> fieldValues = new HashMap<>();
 
                 // 提取字段值
@@ -71,7 +70,6 @@ public class DBUtilSearch {
                 }
 
                 // 构建 MonitorData 对象
-//                MonitorData data = new MonitorData(localtime, fieldValues);
                 MonitorData data = new MonitorData(time, fieldValues);
                 result.add(data);
             }

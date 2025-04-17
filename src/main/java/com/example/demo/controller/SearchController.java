@@ -5,15 +5,10 @@ import com.example.demo.entity.JinMaData;
 import com.example.demo.entity.MonitorData;
 import com.example.demo.entity.WeatherData;
 import com.example.demo.entity.WeightData;
-import com.example.demo.service.DynamicWeighingService;
-import com.example.demo.service.JinMaDataService;
-import com.example.demo.service.RedisService;
-import com.example.demo.service.WeatherService;
-import com.example.demo.utils.DBUtilSearch;
+import com.example.demo.service.*;
 import com.example.demo.utils.LogUtil;
 import com.influxdb.client.InfluxDBClient;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
@@ -26,8 +21,11 @@ public class SearchController {
 
 
     private final InfluxDBClient influxDBClient;
+    private final DynamicWeighingService dynamicWeighingService;
+    private final WeatherService weatherService;
     private final JinMaDataService jinMaDataService;
     private final RedisService redisService;
+    private final HighSensorService highSensorService;
 
 
     @PostMapping("/high_sensor")
@@ -51,7 +49,7 @@ public class SearchController {
             System.out.println("缓存未命中");
             // 需要查询数据库
             List<String> fieldList = Arrays.asList(fields.split(","));
-            List<MonitorData> result = DBUtilSearch.BaseQuery(influxDBClient, fieldList,
+            List<MonitorData> result = highSensorService.queryData(influxDBClient, fieldList,
                     startTime, stopTime, samplingInterval);
 
             // 缓存结果
@@ -72,7 +70,6 @@ public class SearchController {
             @RequestParam Long startTime,
             @RequestParam Long stopTime,
             @RequestParam String userId) {
-        DynamicWeighingService dynamicWeighingService = new DynamicWeighingService();
         try {
             List<WeightData> result = dynamicWeighingService.queryWeightData(influxDBClient, startTime, stopTime);
 
@@ -91,7 +88,6 @@ public class SearchController {
             @RequestParam Long startTime,
             @RequestParam Long stopTime,
             @RequestParam String userId) {
-        WeatherService weatherService = new WeatherService();
         try {
             List<WeatherData> result = weatherService.queryWeatherData(influxDBClient, startTime, stopTime);
 

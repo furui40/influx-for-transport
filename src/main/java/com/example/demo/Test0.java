@@ -1,11 +1,7 @@
 package com.example.demo;
 
-import com.example.demo.entity.JinMaData;
-import com.example.demo.service.JinMaDataService;
-import com.example.demo.service.WeatherService;
 import com.example.demo.utils.DBUtilInsert;
 import com.example.demo.utils.DataRevise;
-import com.example.demo.utils.DataRevise2;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,8 +9,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 
@@ -41,7 +35,7 @@ public class Test0 {
         System.out.println("started!");
 
         // 高频传感器写入
-//        DBUtilInsert.writeDataFromFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        DBUtilInsert.writeDataFromFile2(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
 //        client.close();
 
         // 测试高频传感器查询
@@ -101,7 +95,7 @@ public class Test0 {
 //        System.out.println(loginResult.getMessage() + loginResult.getData());
 
         // 跨解调器的土压力传感器数据修正
-        DataRevise.dataRevise(client, Instant.ofEpochSecond(1720749600L), Instant.ofEpochSecond(1720753200L));
+//        DataRevise.dataRevise(client, Instant.ofEpochSecond(1720749600L), Instant.ofEpochSecond(1720749700L),3);
 //        System.out.println("finished");
 
 //        client.close();

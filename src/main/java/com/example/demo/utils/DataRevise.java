@@ -1,5 +1,6 @@
 package com.example.demo.utils;
 
+import com.example.demo.entity.SensorParams;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.QueryApi;
 import com.influxdb.client.WriteApiBlocking;
@@ -7,33 +8,32 @@ import com.influxdb.client.domain.WritePrecision;
 import com.influxdb.client.write.Point;
 import com.influxdb.query.FluxRecord;
 import com.influxdb.query.FluxTable;
+
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
+import static com.example.demo.common.ItemMapping.sensorParamsMap;
 
 public class DataRevise {
 
-    private static final int PAGE_SIZE_SECONDS = 100; // 分页大小（秒）
-    private static final int BATCH_SIZE = 10000; // 批量写入大小
+    private static final int PAGE_SIZE_SECONDS = 100;
+    private static final int BATCH_SIZE = 10000;
     private static final String influxDbBucket = "test2";
-
     private static final String influxDbOrg = "test";
 
-    // 需要修正的信道配置
     private static final Map<String, CrossDecoderConfig> CONFIG_MAP = new HashMap<>() {{
-        // 解调器1的信道配置
-        put("1_Ch27", new CrossDecoderConfig("2_Ch20", "2_Ch20"));
-        put("1_Ch28", new CrossDecoderConfig("2_Ch20", "2_Ch20"));
-        put("1_Ch29", new CrossDecoderConfig("2_Ch20", "2_Ch20"));
-        // 解调器3的信道配置
-        put("3_Ch27", new CrossDecoderConfig("4_Ch20", "4_Ch20"));
-        put("3_Ch28", new CrossDecoderConfig("4_Ch20", "4_Ch20"));
-        put("3_Ch29", new CrossDecoderConfig("4_Ch20", "4_Ch20"));
+        put("1_Ch27", new CrossDecoderConfig("2", "Ch20"));
+        put("1_Ch28", new CrossDecoderConfig("2", "Ch20"));
+        put("1_Ch29", new CrossDecoderConfig("2", "Ch20"));
+        put("3_Ch27", new CrossDecoderConfig("4", "Ch20"));
+        put("3_Ch28", new CrossDecoderConfig("4", "Ch20"));
+        put("3_Ch29", new CrossDecoderConfig("4", "Ch20"));
     }};
 
-    public static void dataRevise(InfluxDBClient client, Instant startTime, Instant stopTime) {
+    public static void dataRevise(InfluxDBClient client, Instant startTime, Instant stopTime, int method) throws IOException {
         WriteApiBlocking writeApi = client.getWriteApiBlocking();
         QueryApi queryApi = client.getQueryApi();
 
@@ -44,57 +44,76 @@ public class DataRevise {
                 currentEnd = stopTime;
             }
 
-            // 1. 查询原始数据
+            // 根据method参数构建不同的Flux查询条件
+            StringBuilder fluxFilter = new StringBuilder();
+            switch (method) {
+                case 1: // 只查询第一组(decoder1和decoder2)
+                    fluxFilter.append("(r.decoder == \"1\" and (r._field == \"Ch27_ori\" or r._field == \"Ch28_ori\" or r._field == \"Ch29_ori\"))\n")
+                            .append("    or (r.decoder == \"2\" and r._field == \"Ch20_ori\")");
+                    break;
+                case 2: // 只查询第二组(decoder3和decoder4)
+                    fluxFilter.append("(r.decoder == \"3\" and (r._field == \"Ch27_ori\" or r._field == \"Ch28_ori\" or r._field == \"Ch29_ori\"))\n")
+                            .append("    or (r.decoder == \"4\" and r._field == \"Ch20_ori\")");
+                    break;
+                case 3: // 查询两组(默认行为)
+                default:
+                    fluxFilter.append("(r.decoder == \"1\" and (r._field == \"Ch27_ori\" or r._field == \"Ch28_ori\" or r._field == \"Ch29_ori\"))\n")
+                            .append("    or (r.decoder == \"2\" and r._field == \"Ch20_ori\")\n")
+                            .append("    or (r.decoder == \"3\" and (r._field == \"Ch27_ori\" or r._field == \"Ch28_ori\" or r._field == \"Ch29_ori\"))\n")
+                            .append("    or (r.decoder == \"4\" and r._field == \"Ch20_ori\")");
+                    break;
+            }
+
             String flux = String.format(
                     "from(bucket: \"%s\")\n" +
                             "|> range(start: %s, stop: %s)\n" +
                             "|> filter(fn: (r) => (\n" +
-                            "    (r.decoder == \"1\" and (r._field == \"Ch27_ori\" or r._field == \"Ch28_ori\" or r._field == \"Ch29_ori\"))\n" +
-                            "    or (r.decoder == \"2\" and r._field == \"Ch20_ori\")\n" +
-                            "    or (r.decoder == \"3\" and (r._field == \"Ch27_ori\" or r._field == \"Ch28_ori\" or r._field == \"Ch29_ori\"))\n" +
-                            "    or (r.decoder == \"4\" and r._field == \"Ch20_ori\")))\n" +
+                            "    %s))\n" +
                             "|> pivot(rowKey: [\"_time\"], columnKey: [\"decoder\", \"_field\"], valueColumn: \"_value\")",
                     influxDbBucket,
                     currentStart.getEpochSecond(),
-                    currentEnd.getEpochSecond()
+                    currentEnd.getEpochSecond(),
+                    fluxFilter.toString()
             );
-            System.out.println("start:" + currentStart.getEpochSecond() + "stop:" + currentEnd.getEpochSecond());
-            List<FluxTable> tables = queryApi.query(flux);
 
-            // 2. 处理并计算修正值
+            List<FluxTable> tables = queryApi.query(flux);
             List<Point> batchPoints = new ArrayList<>(BATCH_SIZE);
 
             for (FluxTable table : tables) {
                 for (FluxRecord record : table.getRecords()) {
                     Instant time = (Instant) record.getValueByKey("_time");
 
-                    // 构建交叉数据映射
                     Map<String, Double> valueMap = new HashMap<>();
                     for (String key : record.getValues().keySet()) {
                         if (key.startsWith("1_") || key.startsWith("2_") ||
                                 key.startsWith("3_") || key.startsWith("4_")) {
-                            valueMap.put(key, (Double) record.getValueByKey(key));
+                            Object val = record.getValueByKey(key);
+                            if (val instanceof Number) {
+                                valueMap.put(key, ((Number) val).doubleValue());
+                            }
                         }
                     }
 
-                    // 处理需要修正的信道
-                    processChannel(writeApi, "1_Ch27", time, valueMap, batchPoints);
-                    processChannel(writeApi, "1_Ch28", time, valueMap, batchPoints);
-                    processChannel(writeApi, "1_Ch29", time, valueMap, batchPoints);
-                    processChannel(writeApi, "3_Ch27", time, valueMap, batchPoints);
-                    processChannel(writeApi, "3_Ch28", time, valueMap, batchPoints);
-                    processChannel(writeApi, "3_Ch29", time, valueMap, batchPoints);
+                    // 根据method参数决定处理哪些通道
+                    for (String key : CONFIG_MAP.keySet()) {
+                        String decoder = key.split("_")[0];
+                        if ((method == 1 && (decoder.equals("1") || decoder.equals("2"))) ||
+                                (method == 2 && (decoder.equals("3") || decoder.equals("4"))) ||
+                                (method == 3)) {
+                            processChannel(key, time, valueMap, batchPoints);
+                        }
+                    }
 
-                    // 批量写入
                     if (batchPoints.size() >= BATCH_SIZE) {
+//                        writeBatchToFile(batchPoints);
                         writeApi.writePoints(influxDbBucket, influxDbOrg, batchPoints);
                         batchPoints.clear();
                     }
                 }
             }
 
-            // 写入剩余数据
             if (!batchPoints.isEmpty()) {
+//                writeBatchToFile(batchPoints);
                 writeApi.writePoints(influxDbBucket, influxDbOrg, batchPoints);
             }
 
@@ -102,7 +121,7 @@ public class DataRevise {
         }
     }
 
-    private static void processChannel(WriteApiBlocking writeApi, String channelKey,
+    private static void processChannel(String channelKey,
                                        Instant time, Map<String, Double> valueMap,
                                        List<Point> batchPoints) {
         String[] parts = channelKey.split("_");
@@ -110,38 +129,36 @@ public class DataRevise {
         String channel = parts[1];
         String targetField = channel + "_rev1";
 
-        // 获取当前信道参数
-        SensorParams params = SensorParamsLoader.getParams(channelKey);
+        SensorParams params = sensorParamsMap.get('0'+channelKey);
         if (params == null) return;
 
-        // 获取关联配置
         CrossDecoderConfig config = CONFIG_MAP.get(channelKey);
         if (config == null) return;
 
-        // 获取原始值
-        Double lambda = valueMap.get(decoder + "_" + channel + "_ori");
+        String currentKey = decoder + "_" + channel + "_ori";
+        Double lambda = valueMap.get(currentKey);
         if (lambda == null) return;
 
-        // 获取关联信道值
-        String s1 = config.sourceDecoder()+ "_ori";
-        Double lambdaT = valueMap.get(s1);
-        SensorParams paramsT = SensorParamsLoader.getParams(config.sourceDecoder());
-        if (lambdaT == null || paramsT == null) return;
+        String sourceKey = config.sourceDecoder + "_" + config.sourceChannel + "_ori";
+        Double lambdaT = valueMap.get(sourceKey);
+        if (lambdaT == null) return;
 
-        // 执行计算
+        String sourceParamKey = config.sourceDecoder + "_" + config.sourceChannel;
+        SensorParams paramsT = sensorParamsMap.get('0'+sourceParamKey);
+        if (paramsT == null) return;
+
         double revisedValue = calculateP(
                 lambda,
-                params.lambda0(),
+                params.getLambda0(),
                 lambdaT,
-                paramsT.lambda0(),
-                params.a(),
-                params.b(),
-                params.K()
+                paramsT.getLambda0(),
+                params.getA(),
+                params.getB(),
+                params.getK()
         );
 
-        // 构建数据点
         Point point = Point.measurement("sensor_data")
-                .addTag("decoder", decoder.toString())
+                .addTag("decoder", decoder)
                 .addField(targetField, revisedValue)
                 .time(time, WritePrecision.NS);
 
@@ -154,37 +171,26 @@ public class DataRevise {
         return (lambda - lambda0 - (lambdaT - lambdaTPrime) * b / a) / K;
     }
 
-    // 交叉解调器配置记录
-    private record CrossDecoderConfig(String sourceDecoder, String sourceChannel) {
-        // 添加方法：返回参数键
-        public String paramsKey() {
-            return sourceDecoder + "_" + sourceChannel;
+    private static class CrossDecoderConfig {
+        String sourceDecoder;
+        String sourceChannel;
+
+        public CrossDecoderConfig(String sourceDecoder, String sourceChannel) {
+            this.sourceDecoder = sourceDecoder;
+            this.sourceChannel = sourceChannel;
         }
     }
 
-    // 参数加载类
-    private static class SensorParamsLoader {
-        private static final Map<String, SensorParams> PARAMS_MAP = new HashMap<>() {{
-            put("1_Ch27", new SensorParams(1537.130, 0.662987, 0.00964, 0.02547));
-            put("1_Ch28", new SensorParams(1539.818, 1.502559, 0.00964, 0.02737));
-            put("1_Ch29", new SensorParams(1543.889, 1.035090, 0.00964, 0.02681));
-            put("3_Ch27", new SensorParams(1538.587, 0.917356, 0.00974, 0.02099));
-            put("3_Ch28", new SensorParams(1543.069, 1.534425, 0.00974, 0.02524));
-            put("3_Ch29", new SensorParams(1551.255, 1.565445, 0.02874, 0.00974));
-            put("2_Ch20", new SensorParams(1553.875, 1.0, 1.0, 1.0)); // 补充示例参数
-            put("4_Ch20", new SensorParams(1559.858, 1.0, 1.0, 1.0)); // 补充示例参数
-        }};
+    private static void writeBatchToFile(List<Point> batchLines) throws IOException {
+        // 获取文件路径中的目录部分
+        String outputFilePath = "E:\\decoder\\01\\2.txt";
 
-        public static SensorParams getParams(String key) {
-            return PARAMS_MAP.get(key);
+        // 打开文件并写入数据
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath, true))) {
+            for (Point line : batchLines) {
+                writer.write(line.toLineProtocol());
+                writer.newLine();
+            }
         }
     }
-
-    // 传感器参数记录类
-    public record SensorParams(
-            double lambda0,
-            double K,
-            double a,
-            double b
-    ) {}
 }

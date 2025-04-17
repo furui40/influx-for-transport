@@ -107,9 +107,9 @@ public class ItemMapping {
         sensorParamsMap.put("01_Ch24", new SensorParams(0.0, 0.0012, 1.0, 1.0, 0));
         sensorParamsMap.put("01_Ch25", new SensorParams(0.0, 0.0012, 1.0, 1.0, 8,List.of(1529.528,1534.065)));
         sensorParamsMap.put("01_Ch26", new SensorParams(0.0, 0.0012, 1.0, 1.0, 8,List.of(1539.712,1543.036,1549.300,1554.618)));
-        sensorParamsMap.put("01_Ch27", new SensorParams(1537.130, 0.662987, 0.00964, 0.02547, 0));
-        sensorParamsMap.put("01_Ch28", new SensorParams(1539.818, 1.502559, 0.00964, 0.02737, 0));
-        sensorParamsMap.put("01_Ch29", new SensorParams(1543.889, 1.035090, 0.00964, 0.02681, 0));
+        sensorParamsMap.put("01_Ch27", new SensorParams(1537.130, 0.662987, 0.00964, 0.02547, 4));
+        sensorParamsMap.put("01_Ch28", new SensorParams(1539.818, 1.502559, 0.00964, 0.02737, 4));
+        sensorParamsMap.put("01_Ch29", new SensorParams(1543.889, 1.035090, 0.00964, 0.02681, 4));
         sensorParamsMap.put("01_Ch30", new SensorParams(1554.823, 0.001142, 1.0, 1.0, 1));
         sensorParamsMap.put("01_Ch31", new SensorParams(1556.772, 0.001124, 1.0, 1.0, 1));
         sensorParamsMap.put("01_Ch32", new SensorParams(1540.122, 0.001125, 1.0, 1.0, 1));
@@ -171,9 +171,9 @@ public class ItemMapping {
         sensorParamsMap.put("03_Ch24", new SensorParams(0.0, 0.0012, 1.0, 1.0, 0));
         sensorParamsMap.put("03_Ch25", new SensorParams(0.0, 0.0012, 1.0, 1.0, 8,List.of(1529.639,1534.548)));
         sensorParamsMap.put("03_Ch26", new SensorParams(0.0, 0.0012, 1.0, 1.0, 8,List.of(1539.086,1544.705,1549.113,1554.048)));
-        sensorParamsMap.put("03_Ch27", new SensorParams(1538.587, 0.917356, 0.00974, 0.02099, 0));
-        sensorParamsMap.put("03_Ch28", new SensorParams(1543.069, 1.534425, 0.00974, 0.02524, 0));
-        sensorParamsMap.put("03_Ch29", new SensorParams(1551.255, 1.565445, 0.02874, 0.00974, 0));
+        sensorParamsMap.put("03_Ch27", new SensorParams(1538.587, 0.917356, 0.00974, 0.02099, 7));
+        sensorParamsMap.put("03_Ch28", new SensorParams(1543.069, 1.534425, 0.00974, 0.02524, 7));
+        sensorParamsMap.put("03_Ch29", new SensorParams(1551.255, 1.565445, 0.02874, 0.00974, 7));
         sensorParamsMap.put("03_Ch30", new SensorParams(1535.631, 0.001143, 1.0, 1.0, 1));
         sensorParamsMap.put("03_Ch31", new SensorParams(1529.946, 0.001111, 1.0, 1.0, 1));
         sensorParamsMap.put("03_Ch32", new SensorParams(1535.973, 0.001185, 1.0, 1.0, 1));

@@ -17,9 +17,9 @@ public class DBUtilInsert {
 
     private static String influxDbOrg = "test";
 
-    private static String influxDbBucket = "test6";
+    private static String influxDbBucket = "test7";
 
-    public static final int BATCH_SIZE = 100000;
+    public static final int BATCH_SIZE = 10000;
 
     public static final int MAX_CHANNELS = 32; // 最大信道数量
     private static final int SAMPLING_FREQUENCY_HZ = 1000; // 采样频率 (Hz)
@@ -347,101 +347,84 @@ public class DBUtilInsert {
         WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
         BufferedReader reader = new BufferedReader(new FileReader(filePath));
         String line;
-        Map<String, Integer> timeCounts = new HashMap<>(); // 记录每个时间点的计数
+        Map<String, Integer> timeCounts = new HashMap<>();
         int processedLines = 0;
         int batchCount = 0;
-        long startTime = System.currentTimeMillis(); // 记录开始时间
-        List<Point> batchPoints = new ArrayList<>(BATCH_SIZE); // 用于批量写入的 Point 列表
+        long startTime = System.currentTimeMillis();
+        List<Point> batchPoints = new ArrayList<>(BATCH_SIZE);
 
-        // 从文件路径中提取解调器编号
-        String decoderId = filePath.split("\\\\")[2]; // 例如：从 "E:\\decoder\\01\\Wave_20240712_010000.txt" 中提取 "01"
-        int decoderNumber = Integer.parseInt(decoderId); // 转换为整数
+        // 提取解调器编号并转换为整数
+        String decoderId = filePath.split("\\\\")[2];
+        int decoderNumber = Integer.parseInt(decoderId);
 
-        // 跳过文件的第一行表头
-        reader.readLine();
+        reader.readLine(); // 跳过表头
 
-        // 读取文件并处理
         while ((line = reader.readLine()) != null) {
             String[] columns = line.split("\t");
-            if (columns.length < 4) {
-                continue;
-            }
+            if (columns.length < 4) continue;
 
-            String baseTime = columns[2].trim(); // 基准时间
-            int counter = timeCounts.getOrDefault(baseTime, 0); // 当前时间点的计数
+            String baseTime = columns[2].trim();
+            int counter = timeCounts.getOrDefault(baseTime, 0);
+            if (counter >= 1000) continue;
+            timeCounts.put(baseTime, counter + 1);
 
-            // 如果当前时间点的数据量已经达到 1000 条，则跳过
-            if (counter >= 1000) {
-                continue;
-            }
+            // 生成纳秒时间戳
+            long timestampNs = convertTimestamp(baseTime, counter, 1000);
 
-            timeCounts.put(baseTime, counter + 1); // 更新计数器
-
-            // 转换基准时间为纳秒时间戳
-            long timestampNs = convertTimestamp(baseTime, counter, 1000); // 采样频率为 1000Hz
-
-            // 提取 32 个信道的原始值
+            // 提取32个信道的原始值
             double[] originalValues = new double[32];
-            for (int i = 3; i < columns.length && (i - 3) / 3 < 32; i += 3) { // 每隔3列取一个信道
+            for (int i = 3; i < columns.length && (i - 3) / 3 < 32; i += 3) {
                 String value = columns[i].replace("|", "").trim();
-
-                // 如果值为空或仅包含竖线或空格，则跳过该信道
-                if (value.isEmpty() || value.equals("|") || value.equals(" ")) {
-                    originalValues[(i - 3) / 3] = 0.0; // 默认值为 0.0
-                    continue;
-                }
-
                 try {
-                    originalValues[(i - 3) / 3] = Double.parseDouble(value); // 提取原始值
+                    originalValues[(i - 3) / 3] = value.isEmpty() ? 0.0 : Double.parseDouble(value);
                 } catch (NumberFormatException e) {
-                    // 如果数据无法解析为数字，则跳过该信道
-                    originalValues[(i - 3) / 3] = 0.0; // 默认值为 0.0
-                    continue;
+                    originalValues[(i - 3) / 3] = 0.0;
                 }
             }
 
-            // 计算实际值
+            // 计算实际值和修正值
             CalculateResult result = Calculator.calculate(originalValues, decoderNumber);
             double[] actualValues = result.getActualValues();
             Map<String, Double> reviseValues = result.getReviseValues();
 
-            // 创建 Point 对象并写入数据库
+            // 创建单条Point并添加所有信道数据
+            Point point = Point.measurement("sensor_data")
+                    .addTag("decoder", String.valueOf(decoderNumber)) // 标签统一用字符串类型
+                    .time(timestampNs, WritePrecision.NS);
+
+            // 添加32个信道的原始值和实际值
             for (int channel = 0; channel < 32; channel++) {
-                Point point = Point.measurement("sensor_data")
-                        .addTag("decoder_id", decoderId) // 添加解调器编号标签
-                        .addTag("channel_id", "Ch" + (channel + 1)) // 添加信道编号标签
-                        .addField("originalValue", originalValues[channel]) // 添加原始值字段
-                        .addField("actualValue", actualValues[channel]) // 添加实际值字段
-                        .time(timestampNs, WritePrecision.NS); // 设置时间戳
+                String channelKey = "Ch" + (channel + 1);
+                point.addField(channelKey + "_ori", originalValues[channel])
+                        .addField(channelKey + "_act", actualValues[channel]);
+            }
 
-                // 将 Point 添加到批量中
-                batchPoints.add(point);
-                processedLines++;
+            // 添加修正值字段
+            reviseValues.forEach((key, value) -> point.addField(key, value));
 
-                // 如果批量达到指定大小，写入数据库
-                if (batchPoints.size() >= BATCH_SIZE) {
-                    writeApiBlocking.writePoints(influxDbBucket, influxDbOrg, batchPoints); // 批量写入
-                    batchPoints.clear(); // 清空批量数据
+            batchPoints.add(point);
+            processedLines++;
 
-                    batchCount++;
-                    long elapsedTime = System.currentTimeMillis() - startTime;
-                    System.out.println("已写入 " + batchCount * BATCH_SIZE / 32 + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
-
-                }
+            // 批量写入
+            if (batchPoints.size() >= BATCH_SIZE) {
+                writeApiBlocking.writePoints(influxDbBucket, influxDbOrg, batchPoints);
+                batchPoints.clear();
+                batchCount++;
+                System.out.printf("已写入 %d 条数据，累计用时：%.1f 秒%n",
+                        batchCount * BATCH_SIZE,
+                        (System.currentTimeMillis() - startTime) / 1000.0);
             }
         }
 
-        // 处理剩余的批量数据
+        // 处理剩余数据
         if (!batchPoints.isEmpty()) {
-            writeApiBlocking.writePoints(influxDbBucket, influxDbOrg, batchPoints); // 批量写入
-            batchCount++;
-            long elapsedTime = System.currentTimeMillis() - startTime;
-            System.out.println("已写入 " + batchCount * BATCH_SIZE / 32 + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
+            writeApiBlocking.writePoints(influxDbBucket, influxDbOrg, batchPoints);
+            System.out.printf("剩余数据已写入，累计用时：%.1f 秒%n",
+                    (System.currentTimeMillis() - startTime) / 1000.0);
         }
 
         reader.close();
-        System.out.println("数据写入完成，共处理 " + processedLines / 32 + " 条数据。");
-        return;
+        System.out.println("数据写入完成，共处理 " + processedLines + " 条数据。");
     }
 
 
@@ -458,8 +441,6 @@ public class DBUtilInsert {
             return 0; // 默认返回 0 时间戳
         }
     }
-
-
 
 
     public static void testsearch(InfluxDBClient client,String channelId,String decoderId){

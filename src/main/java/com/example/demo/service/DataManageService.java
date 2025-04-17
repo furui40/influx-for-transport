@@ -23,6 +23,9 @@ public class DataManageService {
     @Value("${data.base-dir:/data}")
     private String baseDir;
 
+    @Value("${data.highSensor-dir}")
+    private String highSensorDir;
+
     @Value("${data.dynamicWeighing-dir}")
     private String dynamicWeighingDir;
 
@@ -63,7 +66,6 @@ public class DataManageService {
             ));
         }
 
-        // Save the merged status
         saveStatusList(statusFile, mergedStatus);
 
         return mergedStatus;
@@ -88,7 +90,6 @@ public class DataManageService {
     }
 
     private void processSingleFile(InfluxDBClient influxDBClient, String dataType, String filePath) throws Exception {
-        // 由您自行处理具体文件处理逻辑
         switch (dataType) {
             case "dynamicWeighing":
                 DynamicWeighingService.processFile(influxDBClient, filePath);
@@ -155,6 +156,8 @@ public class DataManageService {
                 return waterPressureDir;
             case "humiture":
                 return humitureDir;
+            case "highSensor":
+                return highSensorDir;
             default:
                 throw new IllegalArgumentException("不支持的数据类型: " + dataType);
         }
