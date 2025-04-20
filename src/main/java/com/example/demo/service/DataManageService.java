@@ -7,14 +7,8 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.nio.file.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +34,8 @@ public class DataManageService {
 
     @Value("${data.humiture-dir}")
     private String humitureDir;
+
+    private static final String HIGH_SENSOR_REVISE_STATUS = "highSensor_revise_status.txt";
 
     public List<FileStatus> getOrCreateStatus(String dataType) throws IOException {
         Path statusFile = getStatusFilePath(dataType);
@@ -68,9 +64,13 @@ public class DataManageService {
 
         saveStatusList(statusFile, mergedStatus);
 
+        // 如果是高频传感器，初始化修正状态文件
+        if ("highSensor".equals(dataType)) {
+            initReviseStatusFile(mergedStatus);
+        }
+
         return mergedStatus;
     }
-
 
     public void processFiles(InfluxDBClient influxDBClient, String dataType, List<String> filePaths) throws Exception {
         Path statusFile = getStatusFilePath(dataType);
@@ -80,6 +80,11 @@ public class DataManageService {
             try {
                 processSingleFile(influxDBClient, dataType, filePath);
                 statusMap.put(filePath, true);
+
+                // 高频传感器特殊处理：更新修正状态文件
+                if ("highSensor".equals(dataType)) {
+                    HighSensorService.checkAndPerformDataRevise(influxDBClient, baseDir, filePath);
+                }
             } catch (Exception e) {
                 statusMap.put(filePath, false);
                 throw new RuntimeException("处理文件失败: " + filePath, e);
@@ -87,6 +92,19 @@ public class DataManageService {
         }
 
         saveStatusMap(statusFile, statusMap);
+    }
+
+    private List<FileStatus> loadStatusFile(Path statusFile) throws IOException {
+        if (!Files.exists(statusFile)) {
+            return new ArrayList<>();
+        }
+
+        return Files.readAllLines(statusFile).stream()
+                .map(line -> {
+                    String[] parts = line.split("\t");
+                    return new FileStatus(parts[0], "已写入".equals(parts[1]));
+                })
+                .collect(Collectors.toList());
     }
 
     private void processSingleFile(InfluxDBClient influxDBClient, String dataType, String filePath) throws Exception {
@@ -98,16 +116,35 @@ public class DataManageService {
                 WeatherService.processFile(influxDBClient, filePath);
                 break;
             case "subside":
-                JinMaDataService.processFile(influxDBClient, filePath,"subside");
+                JinMaDataService.processFile(influxDBClient, filePath, "subside");
                 break;
             case "waterPressure":
-                JinMaDataService.processFile(influxDBClient, filePath,"waterPressure");
+                JinMaDataService.processFile(influxDBClient, filePath, "waterPressure");
                 break;
             case "humiture":
-                JinMaDataService.processFile(influxDBClient, filePath,"humiture");
+                JinMaDataService.processFile(influxDBClient, filePath, "humiture");
+                break;
+            case "highSensor":
+                // 高频传感器使用专门的写入方法
+                HighSensorService.processFile(influxDBClient, filePath);
                 break;
             default:
                 throw new IllegalArgumentException("不支持的数据类型: " + dataType);
+        }
+    }
+
+    private void initReviseStatusFile(List<FileStatus> highSensorStatus) throws IOException {
+        Path reviseStatusFile = Paths.get(baseDir, HIGH_SENSOR_REVISE_STATUS);
+
+        // 如果修正状态文件不存在，则创建
+        if (!Files.exists(reviseStatusFile)) {
+            // 从已写入的文件中复制，但状态设为未修正
+            List<FileStatus> reviseStatus = highSensorStatus.stream()
+                    .filter(FileStatus::isProcessed)
+                    .map(fs -> new FileStatus(fs.getFilePath(), false))
+                    .collect(Collectors.toList());
+
+            saveStatusList(reviseStatusFile, reviseStatus);
         }
     }
 
@@ -192,7 +229,6 @@ public class DataManageService {
         Files.write(statusFile, lines, StandardCharsets.UTF_8);
     }
 
-    // 新增方法：执行xls转xlsx的Python脚本
     private void convertXlsToXlsx(String directory) throws IOException {
         String pythonScript = "E:\\project\\Platform\\script\\XlsConvertToXlsx.py";
         String[] command = new String[]{"python", pythonScript, directory};

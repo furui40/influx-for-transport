@@ -22,7 +22,7 @@ data:
   subside-dir: E:/data/2024二三季度数据/金玛/沉降
   waterPressure-dir: E:/data/2024二三季度数据/金玛/孔隙水压力
   humiture-dir: E:/data/2024二三季度数据/金玛/温湿度
-  highSensor-dir: E:/decoder
+  highSensor-dir: E:/decoder_test
 
 # InfluxDB 配置
 influxdb:

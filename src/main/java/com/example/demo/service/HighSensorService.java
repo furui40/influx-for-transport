@@ -1,265 +1,271 @@
 package com.example.demo.service;
 
+import com.example.demo.entity.FileStatus;
 import com.example.demo.entity.MonitorData;
-import com.example.demo.utils.*;
+import com.example.demo.utils.DBUtilSearch;
+import com.example.demo.utils.DataRevise;
+import com.example.demo.utils.DBUtilInsert;
+import com.example.demo.utils.LogUtil;
 import com.influxdb.client.InfluxDBClient;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.*;
-import java.nio.file.*;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class HighSensorService {
 
-    @Value("${data.base-dir:/data}")
-    private String baseDir;
-
-    private static final String STATUS_FILE = "highsensor_status.txt";
-    private static final String REVISE_STATUS_FILE = "highsensor_revise_status.txt";
     private static final DateTimeFormatter FILE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+    private static final String HIGH_SENSOR_REVISE_STATUS = "highSensor_revise_status.txt";
 
-    /**
-     * 初始化服务，创建必要的状态文件
-     */
-    public void initialize() throws IOException {
-        Path statusPath = Paths.get(baseDir, STATUS_FILE);
-        Path reviseStatusPath = Paths.get(baseDir, REVISE_STATUS_FILE);
-
-        if (!Files.exists(statusPath)) {
-            Files.createFile(statusPath);
-        }
-
-        if (!Files.exists(reviseStatusPath)) {
-            Files.createFile(reviseStatusPath);
-        }
-    }
-
-    /**
-     * 处理单个数据文件
-     * @param client InfluxDB客户端
-     * @param filePath 文件路径
-     */
-    public void processDataFile(InfluxDBClient client, String filePath) throws IOException {
-        // 检查文件是否已处理
-        if (isFileProcessed(filePath)) {
-            return;
-        }
-
-        // 写入数据到数据库
-        DBUtilInsert.writeDataFromFile1(client, filePath);
-
-        // 更新状态文件
-        updateStatusFile(filePath, true);
-
-        // 检查是否需要执行数据修正
-        checkAndPerformDataRevise(client);
-    }
-
-    /**
-     * 查询数据
-     * @param client InfluxDB客户端
-     * @param fields 需要查询的字段列表
-     * @param startTime 开始时间(秒)
-     * @param stopTime 结束时间(秒)
-     * @param samplingInterval 采样间隔
-     * @return 查询结果列表
-     */
-    public List<MonitorData> queryData(InfluxDBClient client, List<String> fields,
-                                       Long startTime, Long stopTime, Long samplingInterval) {
+    public static List<MonitorData> queryData(InfluxDBClient client, List<String> fields,
+                                              Long startTime, Long stopTime, Long samplingInterval) {
         return DBUtilSearch.BaseQuery(client, fields, startTime, stopTime, samplingInterval);
     }
 
-    /**
-     * 检查文件是否已处理
-     * @param filePath 文件路径
-     * @return 是否已处理
-     */
-    private boolean isFileProcessed(String filePath) throws IOException {
-        Path statusPath = Paths.get(baseDir, STATUS_FILE);
-        if (!Files.exists(statusPath)) {
+    public static void processFile(InfluxDBClient influxDBClient, String filePath) throws IOException {
+        DBUtilInsert.writeDataFromFile1(influxDBClient, filePath);
+    }
+
+    public static void checkAndPerformDataRevise(InfluxDBClient client, String baseDir, String filePath) throws IOException {
+        // 1. 首先在修正状态文件中添加当前文件记录（如果不存在）
+        addFileToReviseStatusIfNotExists(baseDir, filePath);
+
+        // 2. 检查是否需要修正
+        Path path = Paths.get(filePath);
+        String fileName = path.getFileName().toString();
+        String decoderId = path.getParent().getFileName().toString();
+
+        if (!fileName.startsWith("Wave_") || !fileName.endsWith(".txt")) {
+            return;
+        }
+
+        // 解析时间部分
+        String timePart = fileName.substring(5, fileName.length() - 4);
+
+        // 确保decoderId是两位数
+        if (decoderId.length() == 1) {
+            decoderId = "0" + decoderId;
+        }
+
+        // 检查是否属于需要修正的组
+        int group = getGroupForDecoder(decoderId);
+        if (group == 0) {
+            return;
+        }
+
+        // 获取同组所有文件
+        List<FileStatus> groupFiles = getGroupFiles(baseDir, timePart, group);
+
+        // 检查是否所有文件都已写入但未修正
+        boolean noneRevised = groupFiles.size() == 2 && groupFiles.stream().noneMatch(fs -> {
+            try {
+                return isFileRevised(baseDir, fs.getFilePath());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        if (noneRevised) {
+            // 执行修正
+            performReviseForGroup(client, timePart, group);
+
+            // 更新修正状态（标记为已修正）
+            markFilesAsRevised(baseDir, groupFiles);
+        }
+    }
+
+    private static void addFileToReviseStatusIfNotExists(String baseDir, String filePath) throws IOException {
+        Path reviseStatusFile = Paths.get(baseDir, HIGH_SENSOR_REVISE_STATUS);
+        List<FileStatus> reviseStatus = new ArrayList<>();
+
+        // 读取现有修正状态
+        if (Files.exists(reviseStatusFile)) {
+            reviseStatus = loadStatusFile(reviseStatusFile);
+        }
+
+        // 检查是否已存在该文件记录
+        boolean exists = reviseStatus.stream()
+                .anyMatch(fs -> fs.getFilePath().equals(filePath));
+
+        // 如果不存在则添加新记录（状态为未修正）
+        if (!exists) {
+            reviseStatus.add(new FileStatus(filePath, false));
+            saveStatusFile(reviseStatusFile, reviseStatus);
+        }
+    }
+
+    private static void markFilesAsRevised(String baseDir, List<FileStatus> files) throws IOException {
+        Path reviseStatusFile = Paths.get(baseDir, HIGH_SENSOR_REVISE_STATUS);
+        List<FileStatus> reviseStatus = loadStatusFile(reviseStatusFile);
+
+        // 更新指定文件的状态
+        for (FileStatus file : files) {
+            for (int i = 0; i < reviseStatus.size(); i++) {
+                if (reviseStatus.get(i).getFilePath().equals(file.getFilePath())) {
+                    reviseStatus.set(i, new FileStatus(file.getFilePath(), true));
+                    break;
+                }
+            }
+        }
+
+        saveStatusFile(reviseStatusFile, reviseStatus);
+    }
+
+    private static int getGroupForDecoder(String decoderId) {
+        if (decoderId.equals("01") || decoderId.equals("02")) {
+            return 1;
+        } else if (decoderId.equals("03") || decoderId.equals("04")) {
+            return 2;
+        }
+        return 0;
+    }
+
+    private static List<FileStatus> getGroupFiles(String baseDir, String timeKey, int group) throws IOException {
+        Path statusFile = Paths.get(baseDir, "highSensor_revise_status.txt");
+        List<FileStatus> allFiles = loadStatusFile(statusFile);
+
+        // 确定需要检查的decoder ID
+        String[] targetDecoders = group == 1 ? new String[]{"01", "02"} : new String[]{"03", "04"};
+
+        return allFiles.stream()
+                .filter(fs -> {
+                    Path path = Paths.get(fs.getFilePath());
+                    String fileName = path.getFileName().toString();
+                    String decoderId = path.getParent().getFileName().toString();
+
+                    if (decoderId.length() == 1) {
+                        decoderId = "0" + decoderId;
+                    }
+
+                    return fileName.startsWith("Wave_" + timeKey) &&
+                            Arrays.asList(targetDecoders).contains(decoderId);
+                })
+                .collect(Collectors.toList());
+    }
+
+    private static boolean isFileRevised(String baseDir, String filePath) throws IOException {
+        Path reviseStatusFile = Paths.get(baseDir, HIGH_SENSOR_REVISE_STATUS);
+        if (!Files.exists(reviseStatusFile)) {
             return false;
         }
 
-        try (BufferedReader reader = Files.newBufferedReader(statusPath)) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split("\t");
-                if (parts.length >= 1 && parts[0].equals(filePath) &&
-                        parts.length >= 2 && parts[1].equals("已写入")) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        List<FileStatus> reviseStatus = loadStatusFile(reviseStatusFile);
+        return reviseStatus.stream()
+                .anyMatch(fs -> fs.getFilePath().equals(filePath) && fs.isProcessed());
     }
 
-    /**
-     * 更新状态文件
-     * @param filePath 文件路径
-     * @param processed 是否已处理
-     */
-    private void updateStatusFile(String filePath, boolean processed) throws IOException {
-        Path statusPath = Paths.get(baseDir, STATUS_FILE);
-        List<String> lines = new ArrayList<>();
+    private static void performReviseForGroup(InfluxDBClient client, String timeKey, int group) {
+        // 解析时间范围（假设每个文件包含1小时数据）
+        LocalDateTime fileTime = LocalDateTime.parse(timeKey, FILE_TIME_FORMATTER);
+        Instant startTime = fileTime.atZone(ZoneId.of("Asia/Shanghai")).toInstant();
+        Instant endTime = startTime.plusSeconds(3600); // 1小时 = 3600秒
 
-        // 读取现有内容
-        if (Files.exists(statusPath)) {
-            lines = Files.readAllLines(statusPath);
+        // 获取同组的解调器ID列表
+        List<String> decoderIds = getDecodersInGroup(group);
+        if (decoderIds.isEmpty()) {
+            return;
         }
 
-        // 更新或添加记录
-        boolean found = false;
-        for (int i = 0; i < lines.size(); i++) {
-            String[] parts = lines.get(i).split("\t");
-            if (parts.length > 0 && parts[0].equals(filePath)) {
-                lines.set(i, filePath + "\t" + (processed ? "已写入" : "未写入"));
-                found = true;
-                break;
-            }
-        }
+        // 最后一秒的时间范围
+//        Instant lastSecondStart = endTime.minusSeconds(1);
+//        Instant lastSecondEnd = endTime;
+        Instant lastSecondStart = startTime;
+        Instant lastSecondEnd = startTime.plusSeconds(1);
 
-        if (!found) {
-            lines.add(filePath + "\t" + (processed ? "已写入" : "未写入"));
-        }
+        boolean allDataPresent;
+        int retryCount = 0;
+        final int maxRetries = 30; // 最大重试30次
+        final long retryInterval = 1000; // 每次等待1秒
 
-        // 写入文件
-        Files.write(statusPath, lines);
-    }
+        do {
+            allDataPresent = true;
+            for (String decoderId : decoderIds) {
+                // 转换为字段名（例如 "01" -> 1_Ch1_ori）
+                int decoderNum = Integer.parseInt(decoderId);
+                String field = String.format("%d_Ch1_ori", decoderNum);
 
-    /**
-     * 检查并执行数据修正
-     * @param client InfluxDB客户端
-     */
-    private void checkAndPerformDataRevise(InfluxDBClient client) throws IOException {
-        // 获取所有已写入但未修正的文件
-        Map<String, Set<String>> groupFiles = getGroupedFilesByTime();
+                // 查询最后一秒数据
+                List<MonitorData> data = HighSensorService.queryData(
+                        client,
+                        Collections.singletonList(field),
+                        lastSecondStart.getEpochSecond(),
+                        lastSecondEnd.getEpochSecond(),
+                        100L // samplingInterval
+                );
 
-        // 检查每组数据是否完整
-        for (Map.Entry<String, Set<String>> entry : groupFiles.entrySet()) {
-            String timeKey = entry.getKey();
-            Set<String> files = entry.getValue();
-
-            // 检查第一组(decoder1和decoder2)
-            if (files.contains("01") && files.contains("02")) {
-                if (!isReviseCompleted(timeKey, 1)) {
-                    performReviseForGroup(client, timeKey, 1);
-                    updateReviseStatus(timeKey, 1);
+                if (data.isEmpty()) {
+                    allDataPresent = false;
+                    // 记录等待日志
+                    String details = String.format("等待解调器 %s 数据，时间: %s", decoderId, lastSecondStart);
+                    LogUtil.logOperation("001", "DATA_REVISE_WAIT", details);
+                    break;
                 }
             }
 
-            // 检查第二组(decoder3和decoder4)
-            if (files.contains("03") && files.contains("04")) {
-                if (!isReviseCompleted(timeKey, 2)) {
-                    performReviseForGroup(client, timeKey, 2);
-                    updateReviseStatus(timeKey, 2);
+            if (!allDataPresent) {
+                retryCount++;
+                if (retryCount > maxRetries) {
+                    throw new RuntimeException("等待超时，无法获取组 " + group + " 的数据");
+                }
+                try {
+                    Thread.sleep(retryInterval);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("修正等待被中断", e);
                 }
             }
+        } while (!allDataPresent);
+
+        // 执行修正
+        try {
+            DataRevise.dataRevise(client, startTime, endTime, group);
+            LogUtil.logOperation("001", "DATA_REVISE", "修正组 " + group + " 数据完成");
+        } catch (IOException e) {
+            throw new RuntimeException("修正数据失败", e);
         }
     }
 
-    /**
-     * 按时间分组获取已写入的文件
-     * @return 按时间分组的文件映射
-     */
-    private Map<String, Set<String>> getGroupedFilesByTime() throws IOException {
-        Path statusPath = Paths.get(baseDir, STATUS_FILE);
-        Map<String, Set<String>> result = new HashMap<>();
+    private static List<String> getDecodersInGroup(int group) {
+        if (group == 1) {
+            return Arrays.asList("01", "02");
+        } else if (group == 2) {
+            return Arrays.asList("03", "04");
+        }
+        return Collections.emptyList();
+    }
 
-        if (!Files.exists(statusPath)) {
+    private static List<FileStatus> loadStatusFile(Path statusFile) throws IOException {
+        List<FileStatus> result = new ArrayList<>();
+
+        if (!Files.exists(statusFile)) {
             return result;
         }
 
-        try (BufferedReader reader = Files.newBufferedReader(statusPath)) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split("\t");
-                if (parts.length >= 2 && parts[1].equals("已写入")) {
-                    String filePath = parts[0];
-                    String fileName = Paths.get(filePath).getFileName().toString();
-
-                    // 解析文件名获取时间和decoder编号
-                    if (fileName.startsWith("Wave_") && fileName.endsWith(".txt")) {
-                        String timePart = fileName.substring(5, fileName.length() - 4);
-                        String decoderId = Paths.get(filePath).getParent().getFileName().toString();
-
-                        // 确保decoderId是两位数
-                        if (decoderId.length() == 1) {
-                            decoderId = "0" + decoderId;
-                        }
-
-                        result.computeIfAbsent(timePart, k -> new HashSet<>()).add(decoderId);
-                    }
-                }
+        for (String line : Files.readAllLines(statusFile)) {
+            String[] parts = line.split("\t");
+            if (parts.length < 2) {
+                throw new IOException("状态文件格式不正确，缺少状态字段: " + line);
             }
+            result.add(new FileStatus(parts[0], "已写入".equals(parts[1])));
         }
 
         return result;
     }
 
-    /**
-     * 检查修正是否已完成
-     * @param timeKey 时间键
-     * @param group 组号(1或2)
-     * @return 是否已完成
-     */
-    private boolean isReviseCompleted(String timeKey, int group) throws IOException {
-        Path reviseStatusPath = Paths.get(baseDir, REVISE_STATUS_FILE);
-        if (!Files.exists(reviseStatusPath)) {
-            return false;
-        }
+    private static void saveStatusFile(Path statusFile, List<FileStatus> statusList) throws IOException {
+        List<String> lines = statusList.stream()
+                .map(fs -> fs.getFilePath() + "\t" + (fs.isProcessed() ? "已写入" : "未写入"))
+                .collect(Collectors.toList());
 
-        try (BufferedReader reader = Files.newBufferedReader(reviseStatusPath)) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split("\t");
-                if (parts.length >= 2 && parts[0].equals(timeKey) &&
-                        parts[1].equals(String.valueOf(group))) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 执行数据修正
-     * @param client InfluxDB客户端
-     * @param timeKey 时间键
-     * @param group 组号(1或2)
-     */
-    private void performReviseForGroup(InfluxDBClient client, String timeKey, int group) throws IOException {
-        // 解析时间范围
-        LocalDateTime fileTime = LocalDateTime.parse(timeKey, FILE_TIME_FORMATTER);
-        Instant startTime = Instant.from(fileTime);
-        Instant endTime = startTime.plusSeconds(3600); // 假设每个文件包含1小时的数据
-
-        // 执行修正
-        DataRevise.dataRevise(client, startTime, endTime, group);
-    }
-
-    /**
-     * 更新修正状态
-     * @param timeKey 时间键
-     * @param group 组号(1或2)
-     */
-    private void updateReviseStatus(String timeKey, int group) throws IOException {
-        Path reviseStatusPath = Paths.get(baseDir, REVISE_STATUS_FILE);
-        List<String> lines = new ArrayList<>();
-
-        // 读取现有内容
-        if (Files.exists(reviseStatusPath)) {
-            lines = Files.readAllLines(reviseStatusPath);
-        }
-
-        // 添加新记录
-        lines.add(timeKey + "\t" + group + "\t" + Instant.now().toString());
-
-        // 写入文件
-        Files.write(reviseStatusPath, lines);
+        Files.write(statusFile, lines);
     }
 }

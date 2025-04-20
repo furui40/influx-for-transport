@@ -21,7 +21,7 @@ public class DataRevise {
 
     private static final int PAGE_SIZE_SECONDS = 100;
     private static final int BATCH_SIZE = 10000;
-    private static final String influxDbBucket = "test2";
+    private static final String influxDbBucket = "test7";
     private static final String influxDbOrg = "test";
 
     private static final Map<String, CrossDecoderConfig> CONFIG_MAP = new HashMap<>() {{
