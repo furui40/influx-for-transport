@@ -38,6 +38,9 @@ public class UserService {
             System.out.println("Username is null.");
             return CommonResult.failed("用户名或密码为空");
         }
+        if (!password.contains("hit1920")) {
+            return CommonResult.failed("请更换密码");
+        }
         QueryApi queryApi = client.getQueryApi();
         String fluxQuery = "from(bucket: \"" + influxDbBucket +"\") " +
                 "|> range(start: 0) " +
@@ -72,6 +75,8 @@ public class UserService {
                 .addTag("user_status", newUser.getUserStatus())
                 .time(Instant.now(), WritePrecision.NS);
 
+        System.out.println(point.toLineProtocol());
+
         // 写入数据库
         client.getWriteApiBlocking().writePoint(influxDbBucket, influxDbOrg, point);
 
@@ -81,69 +86,40 @@ public class UserService {
 
     // 登录验证方法
     public static CommonResult<String> validateLogin(InfluxDBClient client, String userName, String password) {
-        // 创建查询语句，检查用户名、密码是否匹配且用户状态为 active
-        if(userName.length() == 0 || password.length() == 0){
-            System.out.println("Username is null.");
+        if (userName.isEmpty() || password.isEmpty()) {
             return CommonResult.failed("用户名或密码为空");
         }
+
         QueryApi queryApi = client.getQueryApi();
         String flux = "from(bucket: \"" + influxDbBucket + "\") " +
                 "|> range(start: 0) " +
                 "|> filter(fn: (r) => r._measurement == \"user_data\") " +
-                "|> filter(fn: (r) => r.user_name == \""+userName +"\" ) ";
-        // 执行查询
+                "|> filter(fn: (r) => r.user_name == \"" + userName + "\")";
+
         List<UserData> users = queryApi.query(flux, UserData.class);
 
-//        System.out.println(flux);
-
-        // 判断是否找到符合条件的用户
         if (users.isEmpty()) {
-            System.out.println("Invalid username");
             return CommonResult.failed("用户名或密码错误");
-        }else{
-            // 如果存在符合条件的用户，返回 user_id
-            for(UserData user : users){
-                System.out.println(user);
-            }
-            String userId = users.get(0).getUserId();
-            return CommonResult.success(userId);
         }
 
+        UserData user = users.get(0);
 
-//        String fluxQuery2 = "from(bucket: \"test2\") " +
-//                "|> range(start: 0) " +
-//                "|> filter(fn: (r) => r._measurement == \"user_data\") " +
-//                "|> filter(fn: (r) => r.user_id == \"" + userId + "\") ";
-//
-//        String temp_password = null;
-//        List<FluxTable> query = client.getQueryApi().query(fluxQuery2);
+        // 验证密码
+        if (!password.equals(user.getPassword())) {
+            return CommonResult.failed("用户名或密码错误");
+        }
 
-//        List<User> users1 = queryApi.query(fluxQuery2, User.class);
-//        for (FluxTable table : query) {
-//            List<FluxRecord> records = table.getRecords();
-//            for (FluxRecord record : records) {
-//                Map<String, Object> values = record.getValues();
-//
-//                for (Map.Entry<String, Object> entry : values.entrySet()) {
-//                    if (entry.getKey().startsWith("_field") || entry.getKey().startsWith("_value")) {
-//                        Object fieldValue = entry.getValue();
-//                        if (entry.getKey().startsWith("_value")) {
-//                            temp_password = (String) fieldValue;
-//                        }
-//                        if (entry.getKey().startsWith("_field") && fieldValue.equals("password")) {
-//                            if (temp_password.equals(password)) {
-//                                System.out.println("Login successful for userId: " + userId);
-//                                return CommonResult.success(userId);
-//                            } else {
-//                                System.out.println("Login failed: Wrong Password!");
-//                                return CommonResult.failed("密码错误");
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-//        }
+        // 如果是管理员账号，要求密码中包含特定口令，例如 "@adminKey"
+        if ("admin".equalsIgnoreCase(user.getUserStatus())) {
+            if (!password.contains("hit1920")) {
+                return CommonResult.failed("管理员口令验证失败");
+            }
+        }
+
+        // 返回 user_id 和 user_status（作为前端识别权限的依据）
+        return CommonResult.success(user.getUserId() + "::" + user.getUserStatus());
     }
+
 
     public static CommonResult<String> modifyPassword(InfluxDBClient client, String userId, String password, String newpassword) {
         // 创建查询语句，检查用户名、密码是否匹配且用户状态为 active

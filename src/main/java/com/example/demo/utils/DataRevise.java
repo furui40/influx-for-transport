@@ -8,6 +8,7 @@ import com.influxdb.client.domain.WritePrecision;
 import com.influxdb.client.write.Point;
 import com.influxdb.query.FluxRecord;
 import com.influxdb.query.FluxTable;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -21,7 +22,8 @@ public class DataRevise {
 
     private static final int PAGE_SIZE_SECONDS = 100;
     private static final int BATCH_SIZE = 10000;
-    private static final String influxDbBucket = "test7";
+
+    private static String influxDbBucket = "test2";
     private static final String influxDbOrg = "test";
 
     private static final Map<String, CrossDecoderConfig> CONFIG_MAP = new HashMap<>() {{

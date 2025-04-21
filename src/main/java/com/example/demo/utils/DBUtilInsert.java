@@ -6,9 +6,11 @@ import com.influxdb.client.WriteApiBlocking;
 import com.influxdb.client.domain.WritePrecision;
 import com.influxdb.client.write.Point;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 
 
 import java.io.*;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -17,7 +19,8 @@ public class DBUtilInsert {
 
     private static String influxDbOrg = "test";
 
-    private static String influxDbBucket = "test7";
+    private static String influxDbBucket = "test2";
+
 
     public static final int BATCH_SIZE = 10000;
 
@@ -505,6 +508,5 @@ public class DBUtilInsert {
             }
         }
     }
-
 
 }

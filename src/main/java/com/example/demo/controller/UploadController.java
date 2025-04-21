@@ -30,7 +30,7 @@ public class UploadController {
 //            for(FileStatus status: statusList){
 //                System.out.println(status);
 //            }
-            System.out.println("datatype:" + dataType);
+//            System.out.println("datatype:" + dataType);
             return CommonResult.success(statusList);
         } catch (IOException e) {
             return CommonResult.failed("状态文件操作失败：" + e.getMessage());
@@ -42,8 +42,8 @@ public class UploadController {
             @RequestParam String dataType,
             @RequestParam String filePaths) {
         try {
-            System.out.println("dataType: " + dataType);
-            System.out.println("filePaths: " + filePaths);
+//            System.out.println("dataType: " + dataType);
+//            System.out.println("filePaths: " + filePaths);
             // 解码文件路径
             List<String> filePathList = Arrays.asList(filePaths.split(","));
 
@@ -62,7 +62,7 @@ public class UploadController {
     @GetMapping("/get_history")
     public CommonResult<List<UploadRecord>> getHistory(@RequestParam String dataType) {
         try {
-            System.out.println(uploadRecordService.getRecords(dataType));
+//            System.out.println(uploadRecordService.getRecords(dataType));
             return CommonResult.success(uploadRecordService.getRecords(dataType));
         } catch (Exception e) {
             return CommonResult.failed("获取历史失败：" + e.getMessage());

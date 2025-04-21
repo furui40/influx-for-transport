@@ -71,4 +71,53 @@ public class MailUtils {
             throw new RuntimeException("发送邮件失败: " + e.getMessage(), e);
         }
     }
+
+    public void sendDownloadLinkEmail(String userEmail, String applyId, String downloadLink) {
+        try {
+            Properties props = new Properties();
+            props.put("mail.smtp.host", mailConfig.getHost());
+            props.put("mail.smtp.port", mailConfig.getPort());
+            props.put("mail.smtp.auth", mailConfig.getProperties().getSmtp().isAuth());
+            props.put("mail.smtp.starttls.enable", mailConfig.getProperties().getSmtp().getStarttls().isEnable());
+            props.put("mail.smtp.ssl.enable", mailConfig.getProperties().getSmtp().isSsl());
+            props.put("mail.smtp.timeout", mailConfig.getProperties().getSmtp().getTimeout());
+
+            // QQ邮箱需要SSL
+            MailSSLSocketFactory sf = new MailSSLSocketFactory();
+            sf.setTrustAllHosts(true);
+            props.put("mail.smtp.ssl.socketFactory", sf);
+            props.put("mail.smtp.ssl.protocols", "TLSv1.2");
+
+            Session session = Session.getInstance(props, new Authenticator() {
+                @Override
+                protected PasswordAuthentication getPasswordAuthentication() {
+                    return new PasswordAuthentication(mailConfig.getUsername(), mailConfig.getPassword());
+                }
+            });
+
+            MimeMessage message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(mailConfig.getFrom()));
+            message.addRecipient(Message.RecipientType.TO, new InternetAddress(userEmail));
+
+            // 设置邮件主题和内容
+            String subject = "您的下载数据已准备好";
+            String content = String.format(
+                    "<html>" +
+                            "<body>" +
+                            "<h3>您的数据下载申请（ID：%s）已处理完成</h3>" +
+                            "<p>下载链接：<a href='%s'>点击下载</a></p>" +
+                            "<p>或复制以下链接到浏览器：%s</p>" +
+                            "<p>链接有效期：7天</p>" +
+                            "</body>" +
+                            "</html>",
+                    applyId, downloadLink, downloadLink);
+
+            message.setSubject(subject);
+            message.setContent(content, "text/html;charset=UTF-8"); // 设置为HTML格式
+
+            Transport.send(message);
+        } catch (Exception e) {
+            throw new RuntimeException("发送下载链接邮件失败: " + e.getMessage(), e);
+        }
+    }
 }

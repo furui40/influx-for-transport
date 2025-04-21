@@ -1,9 +1,11 @@
 package com.example.demo.utils;
 
 import com.example.demo.entity.MonitorData;
+import com.example.demo.service.DynamicWeighingService;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.query.FluxRecord;
 import com.influxdb.query.FluxTable;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -13,19 +15,12 @@ import java.util.Map;
 
 public class DBUtilSearch {
 
-    /**
-     * 查询数据
-     *
-     * @param client    InfluxDB 客户端
-     * @param fields    需要查询的字段列表（如 ["1_Ch1_ori", "2_Ch2_act"]）
-     * @param startTime 查询起始时间（时间戳，秒）
-     * @param stopTime  查询结束时间（时间戳，秒）
-     * @return 查询结果列表
-     */
+    private static String influxDbBucket = "test2";
+
     public static List<MonitorData> BaseQuery(InfluxDBClient client, List<String> fields,
                                               Long startTime, Long stopTime, Long samplingInterval) {
         // 构建 Flux 查询语句
-        StringBuilder flux = new StringBuilder("from(bucket: \"test7\") ")
+        StringBuilder flux = new StringBuilder("from(bucket: \"").append(influxDbBucket).append("\") ")
                 .append("|> range(start: ").append(startTime)
                 .append(", stop: ").append(stopTime).append(") ")
                 .append("|> filter(fn: (r) => ");

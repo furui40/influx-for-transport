@@ -24,15 +24,20 @@ public class UserController {
     public CommonResult<String> login(@RequestParam String username, @RequestParam String password) {
         CommonResult<String> loginResult = userService.validateLogin(influxDBClient, username, password);
 
-        // 记录登录操作日志
         if (loginResult.getCode() == 200) {
-            LogUtil.logOperation(loginResult.getData(), "LOGIN", "User logged in successfully");
+            String[] parts = loginResult.getData().split("::");
+            String userId = parts[0];
+            String status = parts.length > 1 ? parts[1] : "normal";
+
+            LogUtil.logOperation(userId, "LOGIN", "User logged in successfully");
+
+            return CommonResult.success(userId + "::" + status);
         } else {
             LogUtil.logOperation("N/A", "LOGIN", "Login failed for username: " + username);
+            return loginResult;
         }
-
-        return loginResult;
     }
+
 
     @PostMapping("/register")
     public CommonResult<String> register(@RequestParam String username, @RequestParam String password) {

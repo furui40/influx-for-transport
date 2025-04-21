@@ -15,7 +15,7 @@ public class UploadRecordService {
     private static final String UPLOAD_KEY_PREFIX = "upload:";
 
     @Autowired
-    @Qualifier("uploadRecordRedisTemplate") // 注入专用模板
+    @Qualifier("uploadRecordRedisTemplate")
     private RedisTemplate<String, Object> redisTemplate;
 
     // 保存或更新记录

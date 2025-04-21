@@ -23,6 +23,7 @@ data:
   waterPressure-dir: E:/data/2024二三季度数据/金玛/孔隙水压力
   humiture-dir: E:/data/2024二三季度数据/金玛/温湿度
   highSensor-dir: E:/decoder_test
+  download-dir: ./downloads
 
 # InfluxDB 配置
 influxdb:
@@ -30,6 +31,7 @@ influxdb:
   token: "PBOFaSOSOj-dRZ_uyvrv8-imu2kIIWjCOOxB_vKXOPs3ZHsuRK9iO7ZvPUKYwJvzunXKNeAo8LJ7rvx3P_qQkw=="
   org: "test"
   bucket: "test4"
+  bucket2: "test2"
 
 # 邮件配置
 mail:
@@ -55,7 +57,7 @@ avatar:
 query:
   cache:
     prefix: "query:"  # Redis键前缀
-    expire-time: 86400 # 过期时间(秒)
+    expire-time: 2592000 # 过期时间(秒)
 
 # 日志配置
 logging:
