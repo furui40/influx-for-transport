@@ -3,7 +3,9 @@ package com.example.demo.controller;
 import com.example.demo.common.CommonResult;
 import com.example.demo.entity.DownloadApply;
 import com.example.demo.entity.MonitorData;
+import com.example.demo.entity.WeightData;
 import com.example.demo.service.DownloadService;
+import com.example.demo.service.DynamicWeighingService;
 import com.example.demo.service.HighSensorService;
 import com.example.demo.utils.LogUtil;
 import com.example.demo.utils.TimeConvert;
@@ -19,6 +21,9 @@ import java.io.File;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -29,6 +34,8 @@ import java.util.List;
 public class DownloadController {
     private final InfluxDBClient influxDBClient;
     private final DownloadService downloadService;
+
+    private final DynamicWeighingService dynamicWeighingService;
 
     @Value("${data.download-dir:/data}")
     private String downloadDir;
@@ -141,6 +148,15 @@ public class DownloadController {
                 dir.mkdirs();
             }
 
+            downloadService.findAndUpdateApply(
+                    influxDBClient,
+                    applyId,
+                    "下载中",
+                    "正在下载",
+                    null,  // 不需要发送状态变更邮件
+                    null   // 不需要原因
+            );
+
             //分割时间范围
             final long MAX_QUERY_INTERVAL = 60; // 1分钟
             long currentStart = startTime;
@@ -163,7 +179,7 @@ public class DownloadController {
                             .format(new Date(currentStart * 1000)) + ".xlsx";
                     String filePath = applyDir + File.separator + fileName;
 
-                    downloadService.writeDataToFile(monitorDataList, applyId, filePath);
+                    downloadService.writeHighSensorDataToFile(monitorDataList, applyId, filePath);
                     fileCount++;
                 }
 
@@ -196,6 +212,109 @@ public class DownloadController {
                 downloadService.updateApplyStatus(influxDBClient, apply);
             } catch (Exception ex) {
                 LogUtil.logOperation(userId, "DOWNLOAD", "Update status failed: " + ex.getMessage());
+            }
+
+            return CommonResult.failed("下载处理失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/startdownload2")
+    public CommonResult startDownload2(
+            @RequestParam String fields,
+            @RequestParam String startTimeStr,
+            @RequestParam String stopTimeStr,
+            @RequestParam String userId,
+            @RequestParam Long samplingInterval,
+            @RequestParam String applyId) {
+
+        try {
+            Long startTime = TimeConvert.parseDateTimeToTimestamp(startTimeStr);
+            Long stopTime = TimeConvert.parseDateTimeToTimestamp(stopTimeStr);
+            List<String> fieldList = Arrays.asList(fields.split(","));
+
+            // 创建下载目录
+            String applyDir = downloadDir + File.separator + applyId;
+            File dir = new File(applyDir);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+
+            downloadService.findAndUpdateApply(
+                    influxDBClient,
+                    applyId,
+                    "下载中",
+                    "正在下载",
+                    null,  // 不需要发送状态变更邮件
+                    null   // 不需要原因
+            );
+
+            // 1. 先查询动态称重数据
+            List<WeightData> weightDataList = dynamicWeighingService.queryWeightData(influxDBClient, startTime, stopTime);
+
+            // 保存完整的称重数据
+            if (weightDataList != null && !weightDataList.isEmpty()) {
+                String weightFilePath = applyDir + File.separator + "动态称重.xlsx";
+                downloadService.writeWeightDataToFile(weightDataList, applyId, weightFilePath);
+            }
+
+            int fileCount = 0;
+
+            // 2. 对每个称重时间点查询前后6秒的高频数据
+            for (WeightData weightData : weightDataList) {
+                long weightTime = weightData.getTimestamp().getEpochSecond();
+                long queryStart = weightTime - 6;  // 前6秒
+                long queryEnd = weightTime + 6;    // 后6秒
+
+                // 确保查询时间在请求的时间范围内
+                queryStart = Math.max(queryStart, startTime);
+                queryEnd = Math.min(queryEnd, stopTime);
+
+                List<MonitorData> monitorDataList = HighSensorService.queryData(
+                        influxDBClient,
+                        fieldList,
+                        queryStart,
+                        queryEnd,
+                        samplingInterval
+                );
+
+                if (monitorDataList != null && !monitorDataList.isEmpty()) {
+                    // 写入文件，文件名包含称重时间戳
+                    Instant weightInstant = weightData.getTimestamp();
+                    ZonedDateTime zonedDateTime = weightInstant.atZone(ZoneId.of("Asia/Shanghai"));
+                    String fileName = zonedDateTime.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+                    String filePath = applyDir + File.separator + fileName;
+
+                    downloadService.writeHighSensorDataToFile(monitorDataList, applyId, filePath);
+                    fileCount++;
+                }
+            }
+
+            // 创建完成标记文件
+            File completeFlag = new File(applyDir + File.separator + "下载已完成");
+            completeFlag.createNewFile();
+
+            // 更新申请状态
+            DownloadApply apply = new DownloadApply()
+                    .setApplyId(applyId)
+                    .setStatus("下载完成")
+                    .setMsg("数据已准备好，共生成" + fileCount + "个文件");
+            downloadService.updateApplyStatus(influxDBClient, apply);
+
+            return CommonResult.success(null, "下载任务已开始处理");
+
+        } catch (Exception e) {
+            // 记录错误日志
+            LogUtil.logOperation(userId, "DOWNLOAD2", "StartDownload2 failed: " + e.getMessage());
+
+            // 更新申请状态为"处理失败"
+            try {
+                DownloadApply apply = new DownloadApply()
+                        .setApplyId(applyId)
+                        .setStatus("下载失败")
+                        .setMsg("下载处理失败: " + e.getMessage());
+                downloadService.updateApplyStatus(influxDBClient, apply);
+            } catch (Exception ex) {
+                LogUtil.logOperation(userId, "DOWNLOAD2", "Update status failed: " + ex.getMessage());
             }
 
             return CommonResult.failed("下载处理失败: " + e.getMessage());
