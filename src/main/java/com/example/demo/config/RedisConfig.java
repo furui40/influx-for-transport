@@ -15,7 +15,7 @@ public class RedisConfig {
     private long timeout;
     private long maxMemory = 2 * 1024 * 1024 * 1024L; // 2GB
 
-    // 新增上传记录专用的Redis配置
+    // 上传记录Redis配置
     private UploadRecordConfig uploadRecord;
 
     @Data
