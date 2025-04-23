@@ -157,7 +157,7 @@ public class DynamicWeighingService {
                 Map<String, String> rowData = new HashMap<>();
 
                 for (Cell cell : row) {
-                    String columnName = ItemMapping.COLUMN_MAPPING.get(sheet.getRow(0).getCell(cell.getColumnIndex()).getStringCellValue());
+                    String columnName = ItemMapping.WEIGHT_COLUMN_MAPPING.get(sheet.getRow(0).getCell(cell.getColumnIndex()).getStringCellValue());
                     String cellValue = getCellValue(cell);
 
                     rowData.put(columnName, cellValue);

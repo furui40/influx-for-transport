@@ -1,12 +1,9 @@
 package com.example.demo.service;
 
 import com.example.demo.common.ItemMapping;
-import com.example.demo.entity.DownloadApply;
+import com.example.demo.entity.*;
 import com.example.demo.common.CommonResult;
 import com.example.demo.common.ResultCode;
-import com.example.demo.entity.MonitorData;
-import com.example.demo.entity.WeatherData;
-import com.example.demo.entity.WeightData;
 import com.example.demo.utils.LogUtil;
 import com.example.demo.utils.MailUtils;
 import com.influxdb.client.InfluxDBClient;
@@ -26,11 +23,19 @@ import org.springframework.stereotype.Service;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+
+import static com.example.demo.common.ItemMapping.WEATHER_COLUMN_MAPPING;
+import static com.example.demo.common.ItemMapping.WEIGHT_COLUMN_MAPPING;
 
 @Service
 @RequiredArgsConstructor
@@ -161,7 +166,7 @@ public class DownloadService {
         }
     }
 
-    public void writeHighSensorDataToFile(List<MonitorData> monitorDataList, String applyId, String filePath) {
+    public void writeHighSensorDataToFile(List<MonitorData> monitorDataList, String filePath) {
         if (monitorDataList == null || monitorDataList.isEmpty()) {
             return;
         }
@@ -211,21 +216,19 @@ public class DownloadService {
         }
     }
 
-    public void writeWeightDataToFile(List<WeightData> weightDataList, String applyId, String filePath) {
-        // 东八区时区
+
+    public void writeWeightDataToFile(List<WeightData> weightDataList, String filePath) {
         ZoneId zoneId = ZoneId.of("Asia/Shanghai");
         DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(zoneId);
 
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("动态称重数据");
 
-            // 创建表头（使用中文列名）
+            // 创建表头（直接使用 WEIGHT_COLUMN_MAPPING 的键）
             Row headerRow = sheet.createRow(0);
             int colNum = 0;
-
-            // 按照ItemMapping的顺序创建表头
-            for (Map.Entry<String, String> entry : ItemMapping.COLUMN_MAPPING.entrySet()) {
-                headerRow.createCell(colNum++).setCellValue(entry.getKey());
+            for (String columnName : WEIGHT_COLUMN_MAPPING.keySet()) {
+                headerRow.createCell(colNum++).setCellValue(columnName);
             }
 
             // 填充数据
@@ -234,24 +237,96 @@ public class DownloadService {
                 Row row = sheet.createRow(rowNum++);
                 colNum = 0;
 
-                // 按照ItemMapping的顺序填充数据
-                for (Map.Entry<String, String> entry : ItemMapping.COLUMN_MAPPING.entrySet()) {
-                    String fieldName = entry.getValue();
-                    switch (fieldName) {
-                        case "id":
-                            row.createCell(colNum).setCellValue(data.getId());
-                            break;
-                        case "timestamp":
-                            String localTime = timeFormatter.format(data.getTimestamp());
-                            row.createCell(colNum).setCellValue(localTime);
-                            break;
-                        case "weightKg":
-                            row.createCell(colNum).setCellValue(data.getWeightKg());
-                            break;
-                        // 添加其他字段的处理...
-                        default:
-                            // 处理其他字段或保留空单元格
-                            row.createCell(colNum).setCellValue("");
+                for (String fieldName : WEIGHT_COLUMN_MAPPING.values()) {
+                    Object value = getFieldValue(data, fieldName, timeFormatter);
+                    if (value != null) {
+                        row.createCell(colNum).setCellValue(value.toString());
+                    }
+                    colNum++;
+                }
+            }
+
+            // 写入文件
+            try (FileOutputStream outputStream = new FileOutputStream(filePath)) {
+                workbook.write(outputStream);
+            }
+        } catch (IOException | ReflectiveOperationException e) {
+            throw new RuntimeException("写入称重数据文件失败", e);
+        }
+    }
+
+    public void writeWeatherDataToFile(List<WeatherData> weatherDataList, String filePath) {
+        ZoneId zoneId = ZoneId.of("Asia/Shanghai");
+        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(zoneId);
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("气象数据");
+
+            // 创建表头
+            Row headerRow = sheet.createRow(0);
+            int colNum = 0;
+            for (String columnName : WEATHER_COLUMN_MAPPING.keySet()) {
+                headerRow.createCell(colNum++).setCellValue(columnName);
+            }
+
+            // 填充数据
+            int rowNum = 1;
+            for (WeatherData data : weatherDataList) {
+                Row row = sheet.createRow(rowNum++);
+                colNum = 0;
+
+                for (String fieldName : WEATHER_COLUMN_MAPPING.values()) {
+                    Object value = getFieldValue(data, fieldName, timeFormatter);
+                    if (value != null) {
+                        row.createCell(colNum).setCellValue(value.toString());
+                    }
+                    colNum++;
+                }
+            }
+
+            // 写入文件
+            try (FileOutputStream outputStream = new FileOutputStream(filePath)) {
+                workbook.write(outputStream);
+            }
+        } catch (IOException | ReflectiveOperationException e) {
+            throw new RuntimeException("写入气象数据文件失败", e);
+        }
+    }
+
+    public void writeJinMaDataToFile(List<JinMaData> jinMaDataList, String filePath, String dataType) {
+        ZoneId zoneId = ZoneId.of("Asia/Shanghai");
+        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(zoneId);
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet(dataType);
+
+            // 获取所有字段名（排除timestamp），并按字典序排序
+            Set<String> fieldNames = jinMaDataList.stream()
+                    .flatMap(data -> data.getFieldValues().keySet().stream())
+                    .collect(Collectors.toCollection(TreeSet::new)); // TreeSet自动排序
+
+            // 创建表头（时间戳 + 排序后的字段名）
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("时间戳");
+            int colNum = 1;
+            for (String fieldName : fieldNames) {
+                headerRow.createCell(colNum++).setCellValue(fieldName);
+            }
+
+            // 填充数据
+            int rowNum = 1;
+            for (JinMaData data : jinMaDataList) {
+                Row row = sheet.createRow(rowNum++);
+
+                // 时间戳（第0列）
+                row.createCell(0).setCellValue(timeFormatter.format(data.getTimestamp()));
+
+                // 动态字段（从第1列开始）
+                colNum = 1;
+                for (String fieldName : fieldNames) {
+                    Double value = data.getFieldValues().get(fieldName);
+                    if (value != null) {
+                        row.createCell(colNum).setCellValue(value);
                     }
                     colNum++;
                 }
@@ -262,8 +337,33 @@ public class DownloadService {
                 workbook.write(outputStream);
             }
         } catch (IOException e) {
-            throw new RuntimeException("写入称重数据文件失败", e);
+            throw new RuntimeException("写入金马数据文件失败", e);
         }
+    }
+
+    // 通用方法：通过反射获取字段值
+    private Object getFieldValue(WeightData data, String fieldName, DateTimeFormatter timeFormatter)
+            throws ReflectiveOperationException {
+        if ("timestamp".equals(fieldName)) {
+            return timeFormatter.format(data.getTimestamp());
+        }
+
+        // 通过反射获取其他字段值
+        String getterName = "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
+        Method getter = WeightData.class.getMethod(getterName);
+        return getter.invoke(data);
+    }
+
+    private Object getFieldValue(WeatherData data, String fieldName, DateTimeFormatter timeFormatter)
+            throws ReflectiveOperationException {
+        if ("timestamp".equals(fieldName)) {
+            return timeFormatter.format(data.getTimestamp());
+        }
+
+        // 通过反射获取其他字段值
+        String getterName = "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
+        Method getter = WeatherData.class.getMethod(getterName);
+        return getter.invoke(data);
     }
 
     public void findAndUpdateApply(

@@ -23,4 +23,13 @@ public class RedisConfig {
         private int database = 1; // 默认使用1号数据库
         private long expireTime = 2592000L; // 默认30天过期(秒)
     }
+
+    // 新增高频传感器配置
+    private HighSensorConfig highSensor;
+
+    @Data
+    public static class HighSensorConfig {
+        private int database = 2;
+        private long expireTime = 2592000L; // 30天过期
+    }
 }

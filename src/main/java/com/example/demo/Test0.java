@@ -2,6 +2,7 @@ package com.example.demo;
 
 import com.example.demo.utils.DBUtilInsert;
 import com.example.demo.utils.DataRevise;
+import com.example.demo.utils.testUtil;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,7 +36,8 @@ public class Test0 {
         System.out.println("started!");
 
         // 高频传感器写入
-//        DBUtilInsert.writeDataFromFile2(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        DBUtilInsert.writeDataFromFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        testUtil.writeDataFromFile(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
 //        client.close();
 
         // 测试高频传感器查询

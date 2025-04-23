@@ -14,6 +14,9 @@ spring:
       upload-record:  # 上传记录专用配置
         database: 1  # 使用1号数据库
         expire-time: 2592000  # 30天过期
+      high-sensor:
+        database: 2
+        expire-time: 2592000
 
 data:
   base-dir: ./data

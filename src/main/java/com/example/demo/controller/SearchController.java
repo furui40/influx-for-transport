@@ -108,6 +108,7 @@ public class SearchController {
             @RequestParam Long stopTime,
             @RequestParam String userId) {
         try {
+//            System.out.println(fields);
             List<String> fieldList = Arrays.asList(fields.split(","));
             List<JinMaData> result = jinMaDataService.queryJinMaData(influxDBClient,startTime, stopTime,fieldList, "subside");
 
@@ -128,6 +129,7 @@ public class SearchController {
             @RequestParam Long stopTime,
             @RequestParam String userId) {
         try {
+//            System.out.println(fields);
             List<String> fieldList = Arrays.asList(fields.split(","));
             List<JinMaData> result = jinMaDataService.queryJinMaData(influxDBClient,startTime, stopTime,fieldList, "waterPressure");
 
@@ -148,6 +150,7 @@ public class SearchController {
             @RequestParam Long stopTime,
             @RequestParam String userId) {
         try {
+//            System.out.println(fields);
             List<String> fieldList = Arrays.asList(fields.split(","));
             List<JinMaData> result = jinMaDataService.queryJinMaData(influxDBClient,startTime, stopTime,fieldList, "humiture");
 

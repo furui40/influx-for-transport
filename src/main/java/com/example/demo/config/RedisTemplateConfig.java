@@ -28,7 +28,7 @@ public class RedisTemplateConfig {
         return template;
     }
 
-    // 上传记录专用的RedisTemplate (使用1号数据库)
+    // 上传记录的RedisTemplate (使用1号数据库)
     @Bean(name = "uploadRecordRedisTemplate")
     public RedisTemplate<String, Object> uploadRecordRedisTemplate() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
@@ -43,6 +43,29 @@ public class RedisTemplateConfig {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
         template.setKeySerializer(new StringRedisSerializer());
+        template.setHashKeySerializer(new StringRedisSerializer());
+        template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
+        template.afterPropertiesSet();
+
+        return template;
+    }
+
+    // 高频传感器RedisTemplate (使用2号数据库)
+    @Bean(name = "highSensorRedisTemplate")
+    public RedisTemplate<String, Object> highSensorRedisTemplate() {
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+        config.setHostName(redisConfig.getHost());
+        config.setPort(redisConfig.getPort());
+        config.setPassword(redisConfig.getPassword());
+        config.setDatabase(redisConfig.getHighSensor().getDatabase());
+
+        LettuceConnectionFactory connectionFactory = new LettuceConnectionFactory(config);
+        connectionFactory.afterPropertiesSet();
+
+        RedisTemplate<String, Object> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+        template.setKeySerializer(new StringRedisSerializer());
+        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
         template.afterPropertiesSet();

@@ -64,7 +64,7 @@ public class WeatherService {
                 Map<String, String> rowData = new HashMap<>();
 
                 for (Cell cell : row) {
-                    String columnName = ItemMapping.COLUMN_MAPPING.get(sheet.getRow(0).getCell(cell.getColumnIndex()).getStringCellValue());
+                    String columnName = ItemMapping.WEATHER_COLUMN_MAPPING.get(sheet.getRow(0).getCell(cell.getColumnIndex()).getStringCellValue());
                     String cellValue = getCellValue(cell);
 
                     rowData.put(columnName, cellValue);
@@ -134,6 +134,8 @@ public class WeatherService {
                         "|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")",
                 influxDbBucket, startTime.toString(), stopTime.toString()
         );
+
+//        System.out.println("fluxQuery: " + fluxQuery);
 
         // 获取QueryApi
         QueryApi queryApi = client.getQueryApi();
