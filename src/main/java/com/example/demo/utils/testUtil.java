@@ -1,12 +1,21 @@
 package com.example.demo.utils;
 
 import com.example.demo.entity.CalculateResult;
+import com.example.demo.service.HighSensorRedisService;
 import com.influxdb.client.InfluxDBClient;
+import com.influxdb.client.WriteApi;
 import com.influxdb.client.WriteApiBlocking;
+import com.influxdb.client.WriteOptions;
 import com.influxdb.client.domain.WritePrecision;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -24,8 +33,12 @@ public class testUtil {
     public static final int BATCH_SIZE = 100000;
 
     // 线程池配置
-    private static final int THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors() * 2;
-    private static final ExecutorService executorService = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+//    private static final int THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors() * 2;
+    private static final int THREAD_POOL_SIZE = 4;
+    private static final ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+
+    private static HighSensorRedisService highSensorRedisService;
+
 
     public static void writeDataFromFile(InfluxDBClient client, String filePath) throws IOException, ExecutionException, InterruptedException {
         WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
@@ -97,7 +110,7 @@ public class testUtil {
             totalReadTime.addAndGet(readEndTime - readStartTime); // 累加读取时间
 
             // 提交任务到线程池
-            Future<List<String>> future = executorService.submit(() -> {
+            Future<List<String>> future = executor.submit(() -> {
                 long calculateStartTime = System.currentTimeMillis();
 
                 // 计算实际值
@@ -182,7 +195,7 @@ public class testUtil {
 
         reader.close();
         System.out.println("数据写入完成，共处理 " + processedLines + " 条数据。");
-        executorService.shutdown(); // 关闭线程池
+        executor.shutdown(); // 关闭线程池
     }
 
     private static long convertTimestamp(String baseTime, int counter, int frequency) {
@@ -208,6 +221,132 @@ public class testUtil {
                 writer.write(line);
                 writer.newLine();
             }
+        }
+    }
+
+    public static void writeDataFromFile1(InfluxDBClient client, String filePath) throws Exception {
+        // 初始化
+        int decoderNumber = Integer.parseInt(filePath.split("\\\\")[2]);
+        WriteApi writeApi = client.getWriteApi(WriteOptions.builder().batchSize(10000).build());
+        File file = new File(filePath);
+        long fileSize = file.length();
+        long chunkSize = fileSize / THREAD_POOL_SIZE;
+        // 多线程处理
+        List<Future<Void>> futures = new ArrayList<>();
+        for (int i = 0; i < THREAD_POOL_SIZE; i++) {
+            final int threadNum = i;
+            futures.add(executor.submit(() -> {
+                List<String> lines = SafeFileProcessor.readFileChunk(filePath,
+                        threadNum * chunkSize,
+                        (threadNum == THREAD_POOL_SIZE-1) ? fileSize : (threadNum+1)*chunkSize);
+
+                List<String> protocolLines = new ArrayList<>();
+                String batchId = null;
+
+                for (int j = 0; j < lines.size(); j++) {
+                    String[] cols = lines.get(j).split("\t");
+                    if (cols.length < 4) continue;
+
+                    // 初始化批次
+                    if (batchId == null) {
+                        batchId = filePath + "_" + cols[1].trim();
+                        highSensorRedisService.startBatch(batchId);
+                    }
+
+                    // 生成行协议
+                    String lp = buildLineProtocol(cols,
+                            generateNanoTimestamp(cols, j),
+                            decoderNumber);
+                    protocolLines.add(lp);
+
+                    // 批量写入
+                    if (protocolLines.size() >= 1000) {
+                        writeToFile(filePath, protocolLines);
+                        writeApi.writeRecords(influxDbBucket, influxDbOrg,
+                                WritePrecision.NS, protocolLines);
+                        protocolLines.clear();
+                    }
+                }
+
+                // 写入剩余数据
+                if (!protocolLines.isEmpty()) {
+                    writeToFile(filePath, protocolLines);
+                    writeApi.writeRecords(influxDbBucket, influxDbOrg,
+                            WritePrecision.NS, protocolLines);
+                }
+
+                highSensorRedisService.markBatchSuccess(batchId);
+                return null;
+            }));
+        }
+
+        // 等待完成
+        executor.shutdown();
+        while (!executor.isTerminated()) {
+            Thread.sleep(1000);
+        }
+    }
+
+    private static String buildLineProtocol(String[] cols, long nanoTimestamp, int decoderNumber) {
+        // 提取原始值
+        double[] originalValues = new double[32];
+        for (int i = 3; i < cols.length && (i-3)/3 < 32; i += 3) {
+            try {
+                originalValues[(i-3)/3] = Double.parseDouble(cols[i].replace("|","").trim());
+            } catch (Exception e) {
+                originalValues[(i-3)/3] = 0.0;
+            }
+        }
+
+        // 计算实际值和修正值
+        CalculateResult result = Calculator.calculate(originalValues, decoderNumber);
+        double[] actualValues = result.getActualValues();
+        Map<String, Double> reviseValues = result.getReviseValues();
+
+        // 构建行协议
+        StringBuilder sb = new StringBuilder()
+                .append(String.format("sensor_data,decoder=%d ", decoderNumber));
+
+        // 添加原始值和实际值
+        for (int channel = 0; channel < 32; channel++) {
+            sb.append(String.format("Ch%d_ori=%f,", channel+1, originalValues[channel]))
+                    .append(String.format("Ch%d_act=%f,", channel+1, actualValues[channel]));
+        }
+
+        // 添加修正值
+        reviseValues.forEach((k,v) -> sb.append(String.format("%s=%f,", k, v)));
+
+        // 移除末尾逗号并添加时间戳
+        if (sb.length() > 0) {
+            sb.setLength(sb.length()-1);
+            sb.append(" ").append(nanoTimestamp);
+        }
+
+        return sb.toString();
+    }
+
+    private static long generateNanoTimestamp(String[] cols, int lineIndex) {
+        long secTimestamp = SafeFileProcessor.parseSecondTimestamp(cols[2]);
+
+        // 首秒数据特殊处理（避免序号从0开始）
+        if (lineIndex == 0) {
+            return secTimestamp * 1_000_000_000L + 500_000; // 默认放在秒中间
+        }
+
+        // 正常数据：1ms间隔
+        return secTimestamp * 1_000_000_000L + (lineIndex % 1000) * 1_000_000;
+    }
+
+    public static void writeToFile(String filePath, List<String> lines) {
+        Path logPath = Paths.get(filePath).getParent().resolve("line_protocol.log");
+        try (BufferedWriter writer = Files.newBufferedWriter(logPath,
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+            for (String line : lines) {
+                writer.write(line);
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("日志写入失败: " + e.getMessage());
         }
     }
 }

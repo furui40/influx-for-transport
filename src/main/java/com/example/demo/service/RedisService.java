@@ -24,8 +24,8 @@ public class RedisService {
 
 
     // 生成查询签名作为缓存key的一部分
-    public String generateQuerySignature(String fields, long startTime, long stopTime) {
-        return fields + "|" + startTime + "|" + stopTime;
+    public String generateQuerySignature(String fields, long startTime, long stopTime, long samplingInterval) {
+        return fields + "|" + startTime + "|" + stopTime + "|" + samplingInterval;
     }
     public String getExistingQueryId(String querySignature) {
         return redisTemplate.opsForValue().get(QUERY_META_PREFIX + querySignature);
@@ -60,10 +60,10 @@ public class RedisService {
         }
     }
 
-    public String cacheQueryResult(String fields, long startTime, long stopTime, List<MonitorData> result) {
+    public String cacheQueryResult(String fields, long startTime, long stopTime, long samplingInterval,List<MonitorData> result) {
         this.checkAndCleanRedisMemory();
 
-        String querySignature = generateQuerySignature(fields, startTime, stopTime);
+        String querySignature = generateQuerySignature(fields, startTime, stopTime, samplingInterval);
         String existingQueryId = redisTemplate.opsForValue().get(QUERY_META_PREFIX + querySignature);
 
         if (existingQueryId != null) {

@@ -38,7 +38,7 @@ public class UserService {
             System.out.println("Username is null.");
             return CommonResult.failed("用户名或密码为空");
         }
-        if (!password.contains("hit1920")) {
+        if (password.contains("hit1920")) {
             return CommonResult.failed("请更换密码");
         }
         QueryApi queryApi = client.getQueryApi();

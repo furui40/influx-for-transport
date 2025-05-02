@@ -2,13 +2,11 @@ package com.example.demo.service;
 
 import com.example.demo.entity.FileStatus;
 import com.example.demo.entity.MonitorData;
-import com.example.demo.utils.DBUtilSearch;
-import com.example.demo.utils.DataRevise;
-import com.example.demo.utils.DBUtilInsert;
-import com.example.demo.utils.LogUtil;
+import com.example.demo.utils.*;
 import com.influxdb.client.InfluxDBClient;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +16,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,13 +29,70 @@ public class HighSensorService {
     private static final DateTimeFormatter FILE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
     private static final String HIGH_SENSOR_REVISE_STATUS = "highSensor_revise_status.txt";
 
+    private static final int THREAD_POOL_SIZE = 8;
+
+    public record TimeRange(long start, long end) {
+    }
+
+    public record QueryTask(TimeRange timeRange, String fileName) {
+    }
+
+    public static int concurrentQueryAndWrite(
+            InfluxDBClient client,
+            List<String> fields,
+            List<QueryTask> tasks,
+            Long samplingInterval,
+            String outputDir,
+            DownloadService downloadService) {
+
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+        AtomicInteger fileCount = new AtomicInteger(0);
+
+        try {
+            List<Future<?>> futures = new ArrayList<>();
+            for (QueryTask task : tasks) {
+                futures.add(executor.submit(() -> {
+                    try {
+                        List<MonitorData> data = queryData(
+                                client,
+                                fields,
+                                task.timeRange().start(),
+                                task.timeRange().end(),
+                                samplingInterval
+                        );
+
+                        if (data != null && !data.isEmpty()) {
+                            String filePath = outputDir + File.separator + task.fileName();
+                            downloadService.writeHighSensorDataToFile(data, filePath);
+                            fileCount.incrementAndGet();
+                        }
+                    } catch (Exception e) {
+                        LogUtil.logOperation("DOWNLOAD","HighSensor query failed: " + e.getMessage());
+                    }
+                }));
+            }
+
+            // 等待所有任务完成
+            for (Future<?> future : futures) {
+                future.get();
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Concurrent query interrupted", e);
+        } finally {
+            executor.shutdown();
+        }
+
+        return fileCount.get();
+    }
+
     public static List<MonitorData> queryData(InfluxDBClient client, List<String> fields,
                                               Long startTime, Long stopTime, Long samplingInterval) {
         return DBUtilSearch.BaseQuery(client, fields, startTime, stopTime, samplingInterval);
     }
 
     public static void processFile(InfluxDBClient influxDBClient, String filePath) throws IOException {
-        DBUtilInsert.writeDataFromFile1(influxDBClient, filePath);
+//        DBUtilInsert.writeDataFromFile1(influxDBClient, filePath);
+        MultiInsert.writeDataFromFile3(influxDBClient,filePath);
     }
 
     public static void checkAndPerformDataRevise(InfluxDBClient client, String baseDir, String filePath) throws IOException {

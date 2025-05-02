@@ -29,4 +29,17 @@ public class LogUtil {
             System.err.println("Failed to write log: " + e.getMessage());
         }
     }
+
+    public static void logOperation(String operation, String details) {
+        String logEntry = String.format(
+                "[%s], Operation: %s, Details: %s\n",
+                LocalDateTime.now().format(DATE_FORMATTER), operation, details
+        );
+
+        try (FileWriter writer = new FileWriter(LOG_FILE_PATH, true)) {
+            writer.write(logEntry);
+        } catch (IOException e) {
+            System.err.println("Failed to write log: " + e.getMessage());
+        }
+    }
 }

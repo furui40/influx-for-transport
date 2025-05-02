@@ -23,33 +23,39 @@ public class Calculator {
 
             result.getActualValues()[channel] = lambda; // 默认值
 
-            switch (params.getMethod()) {
-                case 1:
-                    result.getActualValues()[channel] = calculateT(lambda, params);
-                    break;
-                case 2:
-                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[9], 1540.044);
-                    break;
-                case 3:
-                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[20], 1550.852);
-                    break;
-                case 4:
-                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[19], 1553.875);
-                    break;
-                case 5:
-                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[9], 1549.809);
-                    break;
-                case 6:
-                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[20], 1556.838);
-                    break;
-                case 7:
-                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[19], 1559.858);
-                    break;
-                case 8:
-                    calculateZYB(channelNumber, decoderNumber, lambda, params, result.getReviseValues());
-                    break;
-                default:
-                    break;
+//            switch (params.getMethod()) {
+//                case 1:
+//                    result.getActualValues()[channel] = calculateT(lambda, params);
+//                    break;
+//                case 2:
+//                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[9], 1540.044);
+//                    break;
+//                case 3:
+//                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[20], 1550.852);
+//                    break;
+//                case 4:
+//                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[19], 1553.875);
+//                    break;
+//                case 5:
+//                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[9], 1549.809);
+//                    break;
+//                case 6:
+//                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[20], 1556.838);
+//                    break;
+//                case 7:
+//                    result.getActualValues()[channel] = calculateP(lambda, params, originalValues[19], 1559.858);
+//                    break;
+//                case 8:
+//                    calculateZYB(channelNumber, decoderNumber, lambda, params, result.getReviseValues());
+//                    break;
+//                default:
+//                    break;
+//            }
+            int method = params.getMethod();
+            if(method < 8 && method > 0){
+                result.getActualValues()[channel] = calculateT(lambda, params);
+            } else if (method == 8) {
+                calculateZYB(channelNumber, decoderNumber, lambda, params, result.getReviseValues());
             }
         }
         return result;

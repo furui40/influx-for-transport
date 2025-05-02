@@ -37,8 +37,10 @@ public class SearchController {
             @RequestParam Long samplingInterval) {
 
         try {
+            System.out.println("fields: " + fields + " start: " + startTime + " stop: " + stopTime + " userId: " + userId + " samplingInterval: " + samplingInterval);
+
             // 先尝试从Redis获取
-            String querySignature = redisService.generateQuerySignature(fields, startTime, stopTime);
+            String querySignature = redisService.generateQuerySignature(fields, startTime, stopTime, samplingInterval);
             String existingQueryId = redisService.getExistingQueryId(querySignature);
 
             if (existingQueryId != null) {
@@ -53,10 +55,12 @@ public class SearchController {
                     startTime, stopTime, samplingInterval);
 
             // 缓存结果
-            String queryId = redisService.cacheQueryResult(fields, startTime, stopTime, result);
+            String queryId = redisService.cacheQueryResult(fields, startTime, stopTime, samplingInterval, result);
 
             LogUtil.logOperation(userId, "QUERY", "HighSensorSearch - Fields: " + fields +
                     ", Start: " + startTime + ", Stop: " + stopTime);
+
+            System.out.println("queryId: " + queryId);
 
             return CommonResult.success(queryId);
         } catch (Exception e) {

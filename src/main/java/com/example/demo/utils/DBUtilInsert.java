@@ -19,10 +19,10 @@ public class DBUtilInsert {
 
     private static String influxDbOrg = "test";
 
-    private static String influxDbBucket = "test2";
+    private static String influxDbBucket = "test8";
 
 
-    public static final int BATCH_SIZE = 10000;
+    public static final int BATCH_SIZE = 50000;
 
     public static final int MAX_CHANNELS = 32; // 最大信道数量
     private static final int SAMPLING_FREQUENCY_HZ = 1000; // 采样频率 (Hz)
@@ -141,9 +141,10 @@ public class DBUtilInsert {
 //                .setActualValue(originalValue); // 实际值可以根据需求设定
 //    }
 //
-//    public static void processAndWriteFile(String filePath, WriteApiBlocking writeApiBlocking) throws IOException {
+//    public static void processAndWriteFile(String filePath, InfluxDBClient client) throws IOException {
+//        WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
 //        String influxDbOrg = "test";
-//        String influxDbBucket = "test2";
+//        String influxDbBucket = "test8";
 //        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
 //            String line;
 //            List<String> batch = new ArrayList<>();
@@ -178,9 +179,9 @@ public class DBUtilInsert {
 //                    batch.clear(); // 清空批次
 //                    batchCount++; // 增加批次计数
 //
-//                    // 如果已经处理了10000行数据，停止程序
-//                    if (processedLines >= 10000) {
-//                        System.out.println("已处理 10000 行数据，停止程序。");
+////                     如果已经处理了10000行数据，停止程序
+//                    if (processedLines >= 3200000) {
+//                        System.out.println("已处理 100000 行数据，停止程序。");
 //                        break;
 //                    }
 //                }
@@ -219,7 +220,164 @@ public class DBUtilInsert {
 //        // 转换为Line Protocol格式
 //        return String.format("sensor_data,decoder=1,channel=ch%s value=%s %s", channel, value, timestampStr);
 //    }
-//
+
+    public static void processAndWriteFile1(InfluxDBClient client, String filePath, int maxRows) throws IOException {
+        WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
+        BufferedReader reader = new BufferedReader(new FileReader(filePath));
+        List<String> batchLines = new ArrayList<>(BATCH_SIZE);
+
+        // 从文件路径提取解调器编号
+        String decoderId = filePath.split("\\\\")[2];
+        int decoderNumber = Integer.parseInt(decoderId);
+
+        // 跳过表头
+        reader.readLine();
+
+        String line;
+        Map<String, Integer> timeCounts = new HashMap<>();
+        int processedLines = 0;
+
+        while ((line = reader.readLine()) != null && processedLines < maxRows) {
+            String[] columns = line.split("\t");
+            if (columns.length < 4) continue;
+
+            String baseTime = columns[2].trim();
+            int counter = timeCounts.getOrDefault(baseTime, 0);
+            if (counter >= 1000) continue;
+
+            timeCounts.put(baseTime, counter + 1);
+            long timestampNs = convertTimestamp(baseTime, counter, 1000);
+
+            // 处理32个通道数据
+            for (int channel = 0; channel < 32; channel++) {
+                int columnIndex = 3 + channel * 3;
+                if (columnIndex >= columns.length) break;
+
+                String valueStr = columns[columnIndex].replace("|", "").trim();
+                double value;
+                try {
+                    value = valueStr.isEmpty() ? 0.0 : Double.parseDouble(valueStr);
+                } catch (NumberFormatException e) {
+                    value = 0.0;
+                }
+
+                // 构建单通道行协议
+                String lp = String.format(
+                        "sensor_data,decoder=%d,channel=%d Ch_ori=%f %d",
+                        decoderNumber,
+                        channel + 1,
+                        value,
+                        timestampNs
+                );
+
+                batchLines.add(lp);
+
+                // 批量写入控制
+                if (batchLines.size() >= BATCH_SIZE) {
+                    writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg,
+                            WritePrecision.NS, String.join("\n", batchLines));
+                    System.out.println("开始写入，当前processedLines： " + processedLines);
+                    batchLines.clear();
+                }
+            }
+            processedLines++;
+        }
+
+        // 写入剩余数据
+        if (!batchLines.isEmpty()) {
+            writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg,
+                    WritePrecision.NS, String.join("\n", batchLines));
+        }
+
+        reader.close();
+    }
+
+    public static void writeDataFromFile0(InfluxDBClient client, String filePath, int maxRows) throws IOException {
+        WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
+        BufferedReader reader = new BufferedReader(new FileReader(filePath));
+        String line;
+        Map<String, Integer> timeCounts = new HashMap<>();
+        int processedLines = 0;
+        long startTime = System.currentTimeMillis();
+        List<String> batchLines = new ArrayList<>(BATCH_SIZE);
+
+        // 从文件路径中提取解调器编号
+        String decoderId = filePath.split("\\\\")[2];
+        int decoderNumber = Integer.parseInt(decoderId);
+
+        // 跳过文件的第一行表头
+        reader.readLine();
+
+        // 读取文件并处理
+        while ((line = reader.readLine()) != null && processedLines < maxRows) {
+            String[] columns = line.split("\t");
+            if (columns.length < 4) {
+                continue;
+            }
+
+            String baseTime = columns[2].trim();
+            int counter = timeCounts.getOrDefault(baseTime, 0);
+
+            if (counter >= 1000) {
+                continue;
+            }
+
+            timeCounts.put(baseTime, counter + 1);
+
+            // 转换基准时间为纳秒时间戳
+            long timestampNs = convertTimestamp(baseTime, counter, 1000);
+
+            // 只提取原始值
+            double[] originalValues = new double[32];
+            for (int i = 3; i < columns.length && (i - 3) / 3 < 32; i += 3) {
+                String value = columns[i].replace("|", "").trim();
+                try {
+                    originalValues[(i - 3) / 3] = value.isEmpty() ? 0.0 : Double.parseDouble(value);
+                } catch (NumberFormatException e) {
+                    originalValues[(i - 3) / 3] = 0.0;
+                }
+            }
+
+            // 构建行协议（只包含原始值）
+            StringBuilder lineProtocolBuilder = new StringBuilder();
+            lineProtocolBuilder.append(String.format("sensor_data,decoder=%d ", decoderNumber));
+            for (int channel = 0; channel < 32; channel++) {
+                lineProtocolBuilder.append(String.format("Ch%d_ori=%f,", channel + 1, originalValues[channel]));
+            }
+            lineProtocolBuilder.setLength(lineProtocolBuilder.length() - 1);
+            lineProtocolBuilder.append(String.format(" %d", timestampNs));
+
+            batchLines.add(lineProtocolBuilder.toString());
+            processedLines++;
+
+            if (batchLines.size() >= BATCH_SIZE) {
+                writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS,
+                        String.join("\n", batchLines));
+                batchLines.clear();
+            }
+        }
+
+        // 处理剩余的批量数据
+        if (!batchLines.isEmpty()) {
+            writeApiBlocking.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS,
+                    String.join("\n", batchLines));
+        }
+
+        reader.close();
+
+        // 统计结果输出
+        long elapsedTime = System.currentTimeMillis() - startTime;
+        double writeSpeed = processedLines / (elapsedTime / 1000.0);
+
+        System.out.println("\n===== 写入统计 =====");
+        System.out.println("文件路径: " + filePath);
+        System.out.println("最大行数限制: " + maxRows);
+        System.out.println("实际写入行数: " + processedLines);
+        System.out.println("总耗时(ms): " + elapsedTime);
+        System.out.printf("写入速度(条/s): %.2f%n", writeSpeed);
+        System.out.println("===================");
+    }
+
     public static void writeDataFromFile1(InfluxDBClient client, String filePath) throws IOException {
         WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
         BufferedReader reader = new BufferedReader(new FileReader(filePath));
@@ -413,7 +571,7 @@ public class DBUtilInsert {
                 writeApiBlocking.writePoints(influxDbBucket, influxDbOrg, batchPoints);
                 batchPoints.clear();
                 batchCount++;
-                System.out.printf("已写入 %d 条数据，累计用时：%.1f 秒%n",
+                System.out.printf("已写入 %d 条数据，累计用时：%.2f 秒%n",
                         batchCount * BATCH_SIZE,
                         (System.currentTimeMillis() - startTime) / 1000.0);
             }
@@ -422,14 +580,13 @@ public class DBUtilInsert {
         // 处理剩余数据
         if (!batchPoints.isEmpty()) {
             writeApiBlocking.writePoints(influxDbBucket, influxDbOrg, batchPoints);
-            System.out.printf("剩余数据已写入，累计用时：%.1f 秒%n",
+            System.out.printf("剩余数据已写入，累计用时：%.2f 秒%n",
                     (System.currentTimeMillis() - startTime) / 1000.0);
         }
 
         reader.close();
         System.out.println("数据写入完成，共处理 " + processedLines + " 条数据。");
     }
-
 
 
     private static long convertTimestamp(String baseTime, int counter, int frequency) {

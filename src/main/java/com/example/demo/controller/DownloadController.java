@@ -135,6 +135,8 @@ public class DownloadController {
             @RequestParam String applyId) {
 
         try {
+            Long start = System.currentTimeMillis();
+
             Long startTime = TimeConvert.parseDateTimeToTimestamp(startTimeStr);
             Long stopTime = TimeConvert.parseDateTimeToTimestamp(stopTimeStr);
 
@@ -157,33 +159,63 @@ public class DownloadController {
             );
 
             //分割时间范围
-            final long MAX_QUERY_INTERVAL = 60; // 1分钟
+//            final long MAX_QUERY_INTERVAL = 15; //
+//            long currentStart = startTime;
+//            int fileCount = 0;
+//
+//            while (currentStart < stopTime) {
+//                long currentStop = Math.min(currentStart + MAX_QUERY_INTERVAL, stopTime);
+//
+//                List<MonitorData> monitorDataList = HighSensorService.queryData(
+//                        influxDBClient,
+//                        fieldList,
+//                        currentStart,
+//                        currentStop,
+//                        samplingInterval
+//                );
+//
+//                if (monitorDataList != null && !monitorDataList.isEmpty()) {
+//                    // 写入文件
+//                    String fileName = new SimpleDateFormat("yyyyMMdd_HHmmss")
+//                            .format(new Date(currentStart * 1000)) + ".xlsx";
+//                    String filePath = applyDir + File.separator + fileName;
+//
+//                    downloadService.writeHighSensorDataToFile(monitorDataList, filePath);
+//                    fileCount++;
+//                }
+//
+//                currentStart = currentStop;
+//            }
+
+            // 分割时间范围并生成任务列表
+            List<HighSensorService.QueryTask> tasks = new ArrayList<>();
+            final long MAX_QUERY_INTERVAL = 15;
             long currentStart = startTime;
-            int fileCount = 0;
 
             while (currentStart < stopTime) {
                 long currentStop = Math.min(currentStart + MAX_QUERY_INTERVAL, stopTime);
 
-                List<MonitorData> monitorDataList = HighSensorService.queryData(
-                        influxDBClient,
-                        fieldList,
-                        currentStart,
-                        currentStop,
-                        samplingInterval
-                );
+                // 生成文件名
+                String fileName = new SimpleDateFormat("yyyyMMdd_HHmmss")
+                        .format(new Date(currentStart * 1000)) + ".xlsx";
 
-                if (monitorDataList != null && !monitorDataList.isEmpty()) {
-                    // 写入文件
-                    String fileName = new SimpleDateFormat("yyyyMMdd_HHmmss")
-                            .format(new Date(currentStart * 1000)) + ".xlsx";
-                    String filePath = applyDir + File.separator + fileName;
-
-                    downloadService.writeHighSensorDataToFile(monitorDataList, filePath);
-                    fileCount++;
-                }
+                tasks.add(new HighSensorService.QueryTask(
+                        new HighSensorService.TimeRange(currentStart, currentStop),
+                        fileName
+                ));
 
                 currentStart = currentStop;
             }
+
+            // 执行并发查询
+            int fileCount = HighSensorService.concurrentQueryAndWrite(
+                    influxDBClient,
+                    fieldList,
+                    tasks,
+                    samplingInterval,
+                    applyDir,
+                    downloadService
+            );
 
             // 创建完成标记文件
             File completeFlag = new File(applyDir + File.separator + "下载已完成");
@@ -196,6 +228,7 @@ public class DownloadController {
                     .setMsg("数据已准备好，共生成" + fileCount + "个文件");
             downloadService.updateApplyStatus(influxDBClient, apply);
 
+            System.out.println("查询下载用时： " + (System.currentTimeMillis() - start)/1000.0 + "秒");
             return CommonResult.success(null, "下载任务已完成");
 
         } catch (Exception e) {
@@ -227,6 +260,8 @@ public class DownloadController {
             @RequestParam String applyId) {
 
         try {
+            Long start = System.currentTimeMillis();
+
             Long startTime = TimeConvert.parseDateTimeToTimestamp(startTimeStr);
             Long stopTime = TimeConvert.parseDateTimeToTimestamp(stopTimeStr);
             List<String> fieldList = Arrays.asList(fields.split(","));
@@ -255,37 +290,66 @@ public class DownloadController {
                 downloadService.writeWeightDataToFile(weightDataList, weightFilePath);
             }
 
-            int fileCount = 0;
 
-            // 对每个称重时间点查询前后6秒的高频数据
+
+//            // 对每个称重时间点查询前后6秒的高频数据
+//            int fileCount = 0;
+//            for (WeightData weightData : weightDataList) {
+//                long weightTime = weightData.getTimestamp().getEpochSecond();
+//                long queryStart = weightTime - 6;  // 前6秒
+//                long queryEnd = weightTime + 6;    // 后6秒
+//
+//                // 确保查询时间在请求的时间范围内
+//                queryStart = Math.max(queryStart, startTime);
+//                queryEnd = Math.min(queryEnd, stopTime);
+//
+//                List<MonitorData> monitorDataList = HighSensorService.queryData(
+//                        influxDBClient,
+//                        fieldList,
+//                        queryStart,
+//                        queryEnd,
+//                        samplingInterval
+//                );
+//
+//                if (monitorDataList != null && !monitorDataList.isEmpty()) {
+//                    // 写入文件，文件名包含称重时间戳
+//                    Instant weightInstant = weightData.getTimestamp();
+//                    ZonedDateTime zonedDateTime = weightInstant.atZone(ZoneId.of("Asia/Shanghai"));
+//                    String fileName = zonedDateTime.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+//                    String filePath = applyDir + File.separator + fileName;
+//
+//                    downloadService.writeHighSensorDataToFile(monitorDataList, filePath);
+//                    fileCount++;
+//                }
+//            }
+
+            // 生成高频数据查询任务
+            List<HighSensorService.QueryTask> tasks = new ArrayList<>();
             for (WeightData weightData : weightDataList) {
                 long weightTime = weightData.getTimestamp().getEpochSecond();
-                long queryStart = weightTime - 6;  // 前6秒
-                long queryEnd = weightTime + 6;    // 后6秒
+                long queryStart = Math.max(weightTime - 6, startTime);
+                long queryEnd = Math.min(weightTime + 6, stopTime);
 
-                // 确保查询时间在请求的时间范围内
-                queryStart = Math.max(queryStart, startTime);
-                queryEnd = Math.min(queryEnd, stopTime);
+                // 生成文件名（使用称重时间戳）
+                Instant weightInstant = weightData.getTimestamp();
+                ZonedDateTime zdt = weightInstant.atZone(ZoneId.of("Asia/Shanghai"));
+                String fileName = zdt.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
 
-                List<MonitorData> monitorDataList = HighSensorService.queryData(
-                        influxDBClient,
-                        fieldList,
-                        queryStart,
-                        queryEnd,
-                        samplingInterval
-                );
-
-                if (monitorDataList != null && !monitorDataList.isEmpty()) {
-                    // 写入文件，文件名包含称重时间戳
-                    Instant weightInstant = weightData.getTimestamp();
-                    ZonedDateTime zonedDateTime = weightInstant.atZone(ZoneId.of("Asia/Shanghai"));
-                    String fileName = zonedDateTime.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
-                    String filePath = applyDir + File.separator + fileName;
-
-                    downloadService.writeHighSensorDataToFile(monitorDataList, filePath);
-                    fileCount++;
-                }
+                tasks.add(new HighSensorService.QueryTask(
+                        new HighSensorService.TimeRange(queryStart, queryEnd),
+                        fileName
+                ));
             }
+
+            // 执行并发查询
+            int fileCount = HighSensorService.concurrentQueryAndWrite(
+                    influxDBClient,
+                    fieldList,
+                    tasks,
+                    samplingInterval,
+                    applyDir,
+                    downloadService
+            );
 
             // 创建完成标记文件
             File completeFlag = new File(applyDir + File.separator + "下载已完成");
@@ -297,6 +361,8 @@ public class DownloadController {
                     .setStatus("下载完成")
                     .setMsg("数据已准备好，共生成" + fileCount + "个文件");
             downloadService.updateApplyStatus(influxDBClient, apply);
+
+            System.out.println("查询下载用时： " + (System.currentTimeMillis() - start)/1000.0 + "秒");
 
             return CommonResult.success(null, "下载任务已完成");
 
@@ -328,6 +394,8 @@ public class DownloadController {
             @RequestParam String applyId) {
 
         try {
+            Long start = System.currentTimeMillis();
+
             Long startTime = TimeConvert.parseDateTimeToTimestamp(startTimeStr);
             Long stopTime = TimeConvert.parseDateTimeToTimestamp(stopTimeStr);
             List<String> fieldList = Arrays.asList(fields.split(","));
@@ -351,7 +419,34 @@ public class DownloadController {
                 downloadService.writeWeightDataToFile(weightDataList, weightFilePath);
             }
 
-            int fileCount = 0;
+            int fileCount = 1;
+
+            List<HighSensorService.QueryTask> tasks = new ArrayList<>();
+            for (WeightData weightData : weightDataList) {
+                long weightTime = weightData.getTimestamp().getEpochSecond();
+                long queryStart = Math.max(weightTime - 6, startTime);
+                long queryEnd = Math.min(weightTime + 6, stopTime);
+
+                // 生成文件名（使用称重时间戳）
+                Instant weightInstant = weightData.getTimestamp();
+                ZonedDateTime zdt = weightInstant.atZone(ZoneId.of("Asia/Shanghai"));
+                String fileName = zdt.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+
+                tasks.add(new HighSensorService.QueryTask(
+                        new HighSensorService.TimeRange(queryStart, queryEnd),
+                        fileName
+                ));
+            }
+
+            // 执行并发查询
+            fileCount += HighSensorService.concurrentQueryAndWrite(
+                    influxDBClient,
+                    fieldList,
+                    tasks,
+                    samplingInterval,
+                    applyDir,
+                    downloadService
+            );
 
             // 处理每个称重点
             for (WeightData weightData : weightDataList) {
@@ -392,32 +487,32 @@ public class DownloadController {
                 processJinMaData(weightData.getTimestamp(), extendedStart, extendedEnd,
                         humitureList, "humiture", humitureDataList);
 
-                // 对每个称重时间点查询前后6秒的高频数据
-                long queryStart = weightTime - 6;  // 前6秒
-                long queryEnd = weightTime + 6;    // 后6秒
-
-                // 确保查询时间在请求的时间范围内
-                queryStart = Math.max(queryStart, startTime);
-                queryEnd = Math.min(queryEnd, stopTime);
-
-                List<MonitorData> monitorDataList = HighSensorService.queryData(
-                        influxDBClient,
-                        fieldList,
-                        queryStart,
-                        queryEnd,
-                        samplingInterval
-                );
-
-                if (monitorDataList != null && !monitorDataList.isEmpty()) {
-                    // 写入文件，文件名包含称重时间戳
-                    Instant weightInstant = weightData.getTimestamp();
-                    ZonedDateTime zonedDateTime = weightInstant.atZone(ZoneId.of("Asia/Shanghai"));
-                    String fileName = zonedDateTime.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
-                    String filePath = applyDir + File.separator + fileName;
-
-                    downloadService.writeHighSensorDataToFile(monitorDataList, filePath);
-                    fileCount++;
-                }
+//                // 对每个称重时间点查询前后6秒的高频数据
+//                long queryStart = weightTime - 6;  // 前6秒
+//                long queryEnd = weightTime + 6;    // 后6秒
+//
+//                // 确保查询时间在请求的时间范围内
+//                queryStart = Math.max(queryStart, startTime);
+//                queryEnd = Math.min(queryEnd, stopTime);
+//
+//                List<MonitorData> monitorDataList = HighSensorService.queryData(
+//                        influxDBClient,
+//                        fieldList,
+//                        queryStart,
+//                        queryEnd,
+//                        samplingInterval
+//                );
+//
+//                if (monitorDataList != null && !monitorDataList.isEmpty()) {
+//                    // 写入文件，文件名包含称重时间戳
+//                    Instant weightInstant = weightData.getTimestamp();
+//                    ZonedDateTime zonedDateTime = weightInstant.atZone(ZoneId.of("Asia/Shanghai"));
+//                    String fileName = zonedDateTime.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+//                    String filePath = applyDir + File.separator + fileName;
+//
+//                    downloadService.writeHighSensorDataToFile(monitorDataList, filePath);
+//                    fileCount++;
+//                }
             }
 
             // 数据写入
@@ -437,6 +532,9 @@ public class DownloadController {
                     .setStatus("下载完成")
                     .setMsg("数据已准备好，共生成" + fileCount + "个文件");
             downloadService.updateApplyStatus(influxDBClient, apply);
+
+            System.out.println("查询下载用时： " + (System.currentTimeMillis() - start)/1000.0 + "秒");
+
             return CommonResult.success(null, "下载任务已开始处理");
         } catch (Exception e) {
             // 记录错误日志

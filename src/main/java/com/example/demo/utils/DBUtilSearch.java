@@ -44,10 +44,16 @@ public class DBUtilSearch {
         flux.append(") ").append(" |> sample(n: ").append(samplingInterval).append(", pos: 0 )");
         flux.append("|> pivot(rowKey: [\"_time\"], columnKey: [\"decoder\", \"_field\"], valueColumn: \"_value\")");
 
-//        System.out.println(flux);
+        String FluxQuery = flux.toString();
+        System.out.println(flux);
 
+//        String FluxQuery = "from(bucket: \"test8\") \n" +
+//                "|> range(start: 1720713600, stop: 1720713605) \n" +
+//                "|> pivot(rowKey: [\"_time\"], columnKey: [\"decoder\", \"_field\"], valueColumn: \"_value\")";
+//        Long time1 = System.currentTimeMillis();
         // 执行查询
-        List<FluxTable> tables = client.getQueryApi().query(flux.toString());
+        List<FluxTable> tables = client.getQueryApi().query(FluxQuery);
+//        System.out.println("查询用时： " + (System.currentTimeMillis()-time1) + "ms");
 
         // 解析查询结果
         List<MonitorData> result = new ArrayList<>();

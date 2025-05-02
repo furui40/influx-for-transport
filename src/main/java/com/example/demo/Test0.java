@@ -1,19 +1,19 @@
 package com.example.demo;
 
-import com.example.demo.utils.DBUtilInsert;
-import com.example.demo.utils.DataRevise;
-import com.example.demo.utils.testUtil;
+import com.example.demo.utils.*;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.concurrent.ExecutionException;
 
 
-@Component
+//@Component
 public class Test0 {
 
     // 注入 application.yml 中的配置
@@ -29,15 +29,22 @@ public class Test0 {
     @Value("${influxdb.bucket}")
     private String influxDbBucket;
 
-    public void testInfluxDB() throws IOException, ExecutionException, InterruptedException {
+    public void testInfluxDB() throws Exception {
         // 使用从配置文件中获取的值创建 InfluxDB 客户端
         InfluxDBClient client = InfluxDBClientFactory.create(influxDbUrl, influxDbToken.toCharArray(), influxDbOrg);
         Long time1 = System.currentTimeMillis();
         System.out.println("started!");
 
         // 高频传感器写入
-//        DBUtilInsert.writeDataFromFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        DBUtilInsert.writeDataFromFile2(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        DBUtilInsert.processAndWriteFile("E:\\decoder\\01\\Wave_20240712_000000_trans.txt",client);
+//        DBUtilInsert.processAndWriteFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt",320000);
+//        DBUtilInsert.writeDataFromFile0(client,"E:\\decoder\\01\\Wave_20240712_000000.txt",3_600_000);
+//        DBUtilInsert.writeDataFromFile0(client,"E:\\decoder\\01\\Wave_20240712_010000.txt",3_300_000);
+//        DBUtilInsert.writeDataFromFile0(client,"E:\\decoder\\01\\Wave_20240712_020000.txt",3_400_000);
 //        testUtil.writeDataFromFile(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        testUtil.writeDataFromFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        Test2.writeDataFromFile3(client,"E:\\decoder\\01\\Wave_20240712_110000.txt");
 //        client.close();
 
         // 测试高频传感器查询
@@ -85,7 +92,7 @@ public class Test0 {
 
         // 完整查询
 //        String bucket = "test2";
-//        DBUtilSearch.BaseQuery(client,bucket, 1720713600L, 1720713601L,"sensor_data","value","Ch1","1",true);
+//        DBUtilSearch.BaseQuery(client, Collections.singletonList("Ch1"),1720713600L, 1720713601L,1L);
 //        client.close();
 
         // 注册新用户

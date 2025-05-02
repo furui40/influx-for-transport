@@ -65,9 +65,9 @@ public class DataManageService {
         saveStatusList(statusFile, mergedStatus);
 
         // 如果是高频传感器，初始化修正状态文件
-        if ("highSensor".equals(dataType)) {
-            initReviseStatusFile(mergedStatus);
-        }
+//        if ("highSensor".equals(dataType)) {
+//            initReviseStatusFile(mergedStatus);
+//        }
 
         return mergedStatus;
     }
@@ -82,9 +82,9 @@ public class DataManageService {
                 statusMap.put(filePath, true);
 
                 // 高频传感器特殊处理：更新修正状态文件
-                if ("highSensor".equals(dataType)) {
-                    HighSensorService.checkAndPerformDataRevise(influxDBClient, baseDir, filePath);
-                }
+//                if ("highSensor".equals(dataType)) {
+//                    HighSensorService.checkAndPerformDataRevise(influxDBClient, baseDir, filePath);
+//                }
             } catch (Exception e) {
                 statusMap.put(filePath, false);
                 throw new RuntimeException("处理文件失败: " + filePath, e);
@@ -125,7 +125,6 @@ public class DataManageService {
                 JinMaDataService.processFile(influxDBClient, filePath, "humiture");
                 break;
             case "highSensor":
-                // 高频传感器使用专门的写入方法
                 HighSensorService.processFile(influxDBClient, filePath);
                 break;
             default:

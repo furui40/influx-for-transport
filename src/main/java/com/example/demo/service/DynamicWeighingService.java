@@ -236,7 +236,7 @@ public class DynamicWeighingService {
                 influxDbBucket, startTime.toString(), stopTime.toString()
         );
 
-        System.out.println(fluxQuery);
+//        System.out.println(fluxQuery);
         // 获取QueryApi
         QueryApi queryApi = client.getQueryApi();
 
