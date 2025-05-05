@@ -125,6 +125,35 @@ public class DownloadController {
         return CommonResult.success(applyIdList,"更改成功");
     }
 
+
+    //分割时间范围
+//            final long MAX_QUERY_INTERVAL = 15; //
+//            long currentStart = startTime;
+//            int fileCount = 0;
+//
+//            while (currentStart < stopTime) {
+//                long currentStop = Math.min(currentStart + MAX_QUERY_INTERVAL, stopTime);
+//
+//                List<MonitorData> monitorDataList = HighSensorService.queryData(
+//                        influxDBClient,
+//                        fieldList,
+//                        currentStart,
+//                        currentStop,
+//                        samplingInterval
+//                );
+//
+//                if (monitorDataList != null && !monitorDataList.isEmpty()) {
+//                    // 写入文件
+//                    String fileName = new SimpleDateFormat("yyyyMMdd_HHmmss")
+//                            .format(new Date(currentStart * 1000)) + ".xlsx";
+//                    String filePath = applyDir + File.separator + fileName;
+//
+//                    downloadService.writeHighSensorDataToFile(monitorDataList, filePath);
+//                    fileCount++;
+//                }
+//
+//                currentStart = currentStop;
+//            }
     @PostMapping("/startdownload")
     public CommonResult startDownload(
             @RequestParam String fields,
@@ -158,64 +187,60 @@ public class DownloadController {
                     null
             );
 
-            //分割时间范围
-//            final long MAX_QUERY_INTERVAL = 15; //
-//            long currentStart = startTime;
-//            int fileCount = 0;
-//
-//            while (currentStart < stopTime) {
-//                long currentStop = Math.min(currentStart + MAX_QUERY_INTERVAL, stopTime);
-//
-//                List<MonitorData> monitorDataList = HighSensorService.queryData(
-//                        influxDBClient,
-//                        fieldList,
-//                        currentStart,
-//                        currentStop,
-//                        samplingInterval
-//                );
-//
-//                if (monitorDataList != null && !monitorDataList.isEmpty()) {
-//                    // 写入文件
-//                    String fileName = new SimpleDateFormat("yyyyMMdd_HHmmss")
-//                            .format(new Date(currentStart * 1000)) + ".xlsx";
-//                    String filePath = applyDir + File.separator + fileName;
-//
-//                    downloadService.writeHighSensorDataToFile(monitorDataList, filePath);
-//                    fileCount++;
-//                }
-//
-//                currentStart = currentStop;
-//            }
+            // 新实现：分批次多线程查询
+            final long BATCH_DURATION = 30 * 60; // 每轮最大查询30分钟(1800秒)
+            final long SEGMENT_DURATION = 30;     // 每个时间片15秒
+            final long REST_INTERVAL = 15 * 1000; // 强制休息15秒(毫秒)
 
-            // 分割时间范围并生成任务列表
-            List<HighSensorService.QueryTask> tasks = new ArrayList<>();
-            final long MAX_QUERY_INTERVAL = 15;
-            long currentStart = startTime;
+            long currentBatchStart = startTime;
+            int totalFileCount = 0;
 
-            while (currentStart < stopTime) {
-                long currentStop = Math.min(currentStart + MAX_QUERY_INTERVAL, stopTime);
+            while (currentBatchStart < stopTime) {
+                long currentBatchEnd = Math.min(currentBatchStart + BATCH_DURATION, stopTime);
 
-                // 生成文件名
-                String fileName = new SimpleDateFormat("yyyyMMdd_HHmmss")
-                        .format(new Date(currentStart * 1000)) + ".xlsx";
+                // 创建本批次的任务列表(按15秒分割)
+                List<HighSensorService.QueryTask> batchTasks = new ArrayList<>();
+                long segmentStart = currentBatchStart;
 
-                tasks.add(new HighSensorService.QueryTask(
-                        new HighSensorService.TimeRange(currentStart, currentStop),
-                        fileName
-                ));
+                while (segmentStart < currentBatchEnd) {
+                    long segmentEnd = Math.min(segmentStart + SEGMENT_DURATION, currentBatchEnd);
 
-                currentStart = currentStop;
+                    String fileName = new SimpleDateFormat("yyyyMMdd_HHmmss")
+                            .format(new Date(segmentStart * 1000)) + ".xlsx";
+
+                    batchTasks.add(new HighSensorService.QueryTask(
+                            new HighSensorService.TimeRange(segmentStart, segmentEnd),
+                            fileName
+                    ));
+
+                    segmentStart = segmentEnd;
+                }
+
+                // 执行本批次并发查询
+                int batchFileCount = HighSensorService.concurrentQueryAndWrite(
+                        influxDBClient,
+                        fieldList,
+                        batchTasks,
+                        samplingInterval,
+                        applyDir,
+                        downloadService
+                );
+
+                totalFileCount += batchFileCount;
+
+                // 如果不是最后一批，则强制休息
+                if (currentBatchEnd < stopTime) {
+                    try {
+                        System.out.println("强制休息");
+                        Thread.sleep(REST_INTERVAL);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        LogUtil.logOperation(userId, "DOWNLOAD", "Thread sleep interrupted");
+                    }
+                }
+
+                currentBatchStart = currentBatchEnd;
             }
-
-            // 执行并发查询
-            int fileCount = HighSensorService.concurrentQueryAndWrite(
-                    influxDBClient,
-                    fieldList,
-                    tasks,
-                    samplingInterval,
-                    applyDir,
-                    downloadService
-            );
 
             // 创建完成标记文件
             File completeFlag = new File(applyDir + File.separator + "下载已完成");
@@ -225,7 +250,7 @@ public class DownloadController {
             DownloadApply apply = new DownloadApply()
                     .setApplyId(applyId)
                     .setStatus("下载完成")
-                    .setMsg("数据已准备好，共生成" + fileCount + "个文件");
+                    .setMsg("数据已准备好，共生成" + totalFileCount + "个文件");
             downloadService.updateApplyStatus(influxDBClient, apply);
 
             System.out.println("查询下载用时： " + (System.currentTimeMillis() - start)/1000.0 + "秒");
@@ -342,7 +367,7 @@ public class DownloadController {
             }
 
             // 执行并发查询
-            int fileCount = HighSensorService.concurrentQueryAndWrite(
+            int fileCount = HighSensorService.concurrentQueryAndWrite2(
                     influxDBClient,
                     fieldList,
                     tasks,
@@ -439,7 +464,7 @@ public class DownloadController {
             }
 
             // 执行并发查询
-            fileCount += HighSensorService.concurrentQueryAndWrite(
+            fileCount += HighSensorService.concurrentQueryAndWrite2(
                     influxDBClient,
                     fieldList,
                     tasks,

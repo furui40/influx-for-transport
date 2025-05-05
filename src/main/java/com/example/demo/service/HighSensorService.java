@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import com.example.demo.entity.FileStatus;
 import com.example.demo.entity.MonitorData;
+import com.example.demo.entity.WeightData;
 import com.example.demo.utils.*;
 import com.influxdb.client.InfluxDBClient;
 import org.springframework.stereotype.Service;
@@ -11,17 +12,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 public class HighSensorService {
@@ -85,14 +84,104 @@ public class HighSensorService {
         return fileCount.get();
     }
 
+    public static int concurrentQueryAndWrite2(
+            InfluxDBClient client,
+            List<String> fields,
+            List<QueryTask> tasks,
+            Long samplingInterval,
+            String outputDir,
+            DownloadService downloadService) {
+
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+        AtomicInteger fileCount = new AtomicInteger(0);
+
+        try {
+            List<Future<?>> futures = new ArrayList<>();
+            for (QueryTask task : tasks) {
+                futures.add(executor.submit(() -> {
+                    try {
+                        List<MonitorData> data = queryData2(
+                                client,
+                                fields,
+                                task.timeRange().start(),
+                                task.timeRange().end(),
+                                samplingInterval
+                        );
+
+                        if (data != null && !data.isEmpty()) {
+                            String filePath = outputDir + File.separator + task.fileName();
+                            downloadService.writeHighSensorDataToFile(data, filePath);
+                            fileCount.incrementAndGet();
+                        }
+                    } catch (Exception e) {
+                        LogUtil.logOperation("DOWNLOAD","HighSensor query failed: " + e.getMessage());
+                    }
+                }));
+            }
+
+            // 等待所有任务完成
+            for (Future<?> future : futures) {
+                future.get();
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Concurrent query interrupted", e);
+        } finally {
+            executor.shutdown();
+        }
+
+        return fileCount.get();
+    }
+
     public static List<MonitorData> queryData(InfluxDBClient client, List<String> fields,
                                               Long startTime, Long stopTime, Long samplingInterval) {
         return DBUtilSearch.BaseQuery(client, fields, startTime, stopTime, samplingInterval);
     }
 
+    public static List<MonitorData> queryData2(InfluxDBClient client, List<String> fields,
+                                              Long startTime, Long stopTime, Long samplingInterval) {
+        return DBUtilSearch.BaseQuery2(client, fields, startTime, stopTime, samplingInterval);
+    }
+
+
     public static void processFile(InfluxDBClient influxDBClient, String filePath) throws IOException {
-//        DBUtilInsert.writeDataFromFile1(influxDBClient, filePath);
-        MultiInsert.writeDataFromFile3(influxDBClient,filePath);
+        // 从文件路径解析时间范围（东八区）
+        String fileName = new File(filePath).getName();
+        Matcher m = Pattern.compile("Wave_(\\d{8})_(\\d{6})\\.txt").matcher(fileName);
+        if (!m.find()) throw new IllegalArgumentException("无效文件名格式");
+
+        // 解析东八区时间
+        LocalDateTime localStart = LocalDateTime.parse(
+                m.group(1) + m.group(2),
+                DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+        );
+        ZonedDateTime zonedStart = localStart.atZone(ZoneId.of("+8"));
+
+        // 转换为UTC时间范围（查询需要标准时）
+        Instant startInstant = zonedStart.toInstant();
+        Instant endInstant = startInstant.plusSeconds(3600);
+
+        // 查询动态称重数据
+        List<WeightData> weightData = DynamicWeighingService.queryWeightData(
+                influxDBClient,
+                startInstant.getEpochSecond(),
+                endInstant.getEpochSecond()
+        );
+
+        // 转换为东八区时间字符串列表（包含前后6秒）
+        Set<String> specialSeconds = weightData.stream()
+                .flatMap(wd -> {
+                    ZonedDateTime baseTime = wd.getTimestamp().atZone(ZoneOffset.UTC) // 原始UTC时间
+                            .withZoneSameInstant(ZoneId.of("+8")); // 转为东八区时间
+
+                    // 生成前后6秒范围（共13秒）
+                    return IntStream.rangeClosed(-6, 6)
+                            .mapToObj(offset -> baseTime.plusSeconds(offset));
+                })
+                .map(zdt -> zdt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd,HH:mm:ss"))) // 注意冒号分隔符
+                .collect(Collectors.toSet());
+
+        // 写入函数
+        MultiInsert.writeDataFromFile4(influxDBClient, filePath, new ArrayList<>(specialSeconds));
     }
 
     public static void checkAndPerformDataRevise(InfluxDBClient client, String baseDir, String filePath) throws IOException {
@@ -236,10 +325,8 @@ public class HighSensorService {
         }
 
         // 最后一秒的时间范围
-//        Instant lastSecondStart = endTime.minusSeconds(1);
-//        Instant lastSecondEnd = endTime;
-        Instant lastSecondStart = startTime;
-        Instant lastSecondEnd = startTime.plusSeconds(1);
+        Instant lastSecondStart = endTime.minusSeconds(1);
+        Instant lastSecondEnd = endTime;
 
         boolean allDataPresent;
         int retryCount = 0;

@@ -51,7 +51,7 @@ public class SearchController {
             System.out.println("缓存未命中");
             // 需要查询数据库
             List<String> fieldList = Arrays.asList(fields.split(","));
-            List<MonitorData> result = highSensorService.queryData(influxDBClient, fieldList,
+            List<MonitorData> result = highSensorService.queryData2(influxDBClient, fieldList,
                     startTime, stopTime, samplingInterval);
 
             // 缓存结果

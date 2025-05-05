@@ -15,11 +15,14 @@ import java.util.concurrent.atomic.AtomicLong;
 public class MultiInsert {
     private static String influxDbOrg = "test";
     private static String influxDbBucket = "test7";
+    private static String influxDbBucket2 = "test8";
     private static final int BUFFER_SIZE = 10500;
     private static final int SECONDS_PER_BATCH = 10;
     private static final int MAX_PER_SECOND = 1000;
     private static final int BATCH_SIZE = 10000;
     private static final int THREAD_POOL_SIZE = 8;
+    private static final Object fileProcessingLock = new Object();
+    private static volatile boolean isProcessing = false;
 
     // 计时统计变量
     private static AtomicLong totalReadTime = new AtomicLong(0);
@@ -241,6 +244,143 @@ public class MultiInsert {
         printFinalStatistics(programStartTime);
     }
 
+    public static void writeDataFromFile4(InfluxDBClient client, String filePath,
+                                          List<String> specialSeconds) throws IOException {
+        // 确保单文件顺序处理
+        synchronized (fileProcessingLock) {
+            if (isProcessing) {
+                throw new IllegalStateException("前一个文件仍在处理中，请等待完成后再处理新文件");
+            }
+            isProcessing = true;
+        }
+
+
+        try {
+            System.out.println("开始处理文件: " + filePath);
+            resetStatistics();
+            long programStartTime = System.currentTimeMillis();
+
+            // 每次处理创建新的线程池
+            ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+            List<Future<?>> futures = new CopyOnWriteArrayList<>();
+
+            try {
+                WriteApiBlocking writeApiRaw = client.getWriteApiBlocking();
+                WriteApiBlocking writeApiSpecial = client.getWriteApiBlocking();
+                Set<String> specialSet = new HashSet<>(specialSeconds);
+
+                // 从文件路径中提取解调器编号
+                String decoderId = filePath.split("\\\\")[2];
+                int decoderNumber = Integer.parseInt(decoderId);
+
+                try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+                    // 文件处理逻辑（保持原有实现）
+                    processFileContent(executor, futures, reader, decoderNumber,
+                            writeApiRaw, writeApiSpecial, specialSet);
+                }
+
+                // 等待任务完成
+                awaitCompletion(futures);
+
+            } finally {
+                // 改进的线程池关闭逻辑
+                shutdownExecutor(executor);
+            }
+
+            // 输出统计信息
+            System.out.println("文件处理完成: " + filePath);
+            printFinalStatistics(programStartTime);
+
+        } finally {
+            synchronized (fileProcessingLock) {
+                isProcessing = false;
+            }
+        }
+    }
+
+    private static void processFileContent(ExecutorService executor, List<Future<?>> futures,
+                                           BufferedReader reader, int decoderNumber,
+                                           WriteApiBlocking writeApiRaw, WriteApiBlocking writeApiSpecial,
+                                           Set<String> specialSet) throws IOException {
+        // 跳过文件的第一行表头
+        reader.readLine();
+
+        Map<String, List<String>> secondBuffer = new LinkedHashMap<>();
+        String line;
+        int lineCount = 0;
+
+        while ((line = reader.readLine()) != null) {
+            lineCount++;
+            String[] columns = line.split("\t");
+            if (columns.length < 4) continue;
+
+            String currentSecond = columns[2].trim();
+            secondBuffer.computeIfAbsent(currentSecond, k -> new ArrayList<>()).add(line);
+
+            if (secondBuffer.get(currentSecond).size() >= MAX_PER_SECOND) {
+                processSecondData4(executor, futures, secondBuffer.remove(currentSecond),
+                        decoderNumber, writeApiRaw, writeApiSpecial, specialSet);
+            }
+
+            if (lineCount % 10000 == 0) {
+                System.out.printf("已读取 %,d 行，当前缓冲秒数 %d%n", lineCount, secondBuffer.size());
+            }
+        }
+
+        // 处理剩余数据
+        for (List<String> data : secondBuffer.values()) {
+            processSecondData4(executor, futures, data, decoderNumber,
+                    writeApiRaw, writeApiSpecial, specialSet);
+        }
+    }
+
+    private static void shutdownExecutor(ExecutorService executor) {
+        executor.shutdown();
+        try {
+            long waitStart = System.currentTimeMillis();
+            while (!executor.isTerminated()) {
+                if (System.currentTimeMillis() - waitStart > 60000) {
+                    System.err.println("线程池关闭超时，强制终止");
+                    executor.shutdownNow();
+                    break;
+                }
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    executor.shutdownNow();
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("关闭线程池时出错: " + e.getMessage());
+            executor.shutdownNow();
+        }
+    }
+    private static void awaitCompletion(List<Future<?>> futures) {
+        for (Future<?> future : futures) {
+            try {
+                future.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.err.println("处理被中断: " + e.getMessage());
+            } catch (ExecutionException e) {
+                System.err.println("处理出错: " + e.getCause().getMessage());
+            }
+        }
+        futures.clear();
+    }
+
+    private static void resetStatistics() {
+        totalReadTime.set(0);
+        totalCalcTime.set(0);
+        totalProtocolTime.set(0);
+        totalWriteTime.set(0);
+        totalProcessTime.set(0);
+        processedRecords.set(0);
+        processedBatches.set(0);
+    }
+
     private static void processSecondData(List<String> lines, String second, int decoderNumber, WriteApiBlocking writeApiBlocking) {
         // 提交处理任务到线程池
         Future<?> future = executor.submit(() -> {
@@ -420,107 +560,6 @@ public class MultiInsert {
         }));
     }
 
-    // 单秒写入
-//    private static void processTenSecondsData3(List<String> dataBatch, int decoderNumber,
-//                                               WriteApiBlocking writeApiBlocking) {
-//        futures.add(executor.submit(() -> {
-//            long batchStartTime = System.currentTimeMillis();
-//            long readTime = 0, calcTime = 0, protocolTime = 0, writeTime = 0;
-//            int recordsProcessed = 0;
-//
-//            try {
-//                // 阶段1: 数据读入和分组
-//                long start = System.currentTimeMillis();
-//                Map<String, List<String>> groupedData = groupDataBySecond(dataBatch);
-//                readTime = System.currentTimeMillis() - start;
-//
-//                // 阶段2-4: 处理每个秒的数据
-//                for (Map.Entry<String, List<String>> entry : groupedData.entrySet()) {
-//                    String second = entry.getKey();
-//                    List<String> lines = entry.getValue();
-//
-//                    // 限制每秒最多处理MAX_PER_SECOND条
-//                    int linesToProcess = Math.min(lines.size(), MAX_PER_SECOND);
-//                    List<String> batchLines = new ArrayList<>(BATCH_SIZE);
-//                    List<String> fileLines = new ArrayList<>(linesToProcess);
-//
-//                    for (int i = 0; i < linesToProcess; i++) {
-//                        String line = lines.get(i);
-//                        String[] columns = line.split("\t");
-//
-//                        // 阶段2: 数据计算
-//                        long calcStart = System.currentTimeMillis();
-//                        double[] originalValues = extractOriginalValues(columns);
-//                        CalculateResult result = Calculator.calculate(originalValues, decoderNumber);
-//                        calcTime += System.currentTimeMillis() - calcStart;
-//
-//                        // 阶段3: 行协议拼接
-//                        long protocolStart = System.currentTimeMillis();
-//                        String lineProtocol = buildLineProtocol(
-//                                decoderNumber,
-//                                originalValues,
-//                                result.getActualValues(),
-//                                result.getReviseValues(),
-//                                convertTimestamp(second, i, 1000)
-//                        );
-//                        protocolTime += System.currentTimeMillis() - protocolStart;
-//
-//                        batchLines.add(lineProtocol);
-//                        fileLines.add(lineProtocol);
-//                        recordsProcessed++;
-//
-//                        // 阶段4: 批量写入
-//                        if (batchLines.size() >= BATCH_SIZE) {
-//                            long writeStart = System.currentTimeMillis();
-////                            writeBatchToFile(fileLines, second, decoderNumber);
-//                            System.out.println("succeed: " + second);
-//                            writeApiBlocking.writeRecord(
-//                                    influxDbBucket,
-//                                    influxDbOrg,
-//                                    WritePrecision.NS,
-//                                    String.join("\n", batchLines)
-//                            );
-//                            writeTime += System.currentTimeMillis() - writeStart;
-//                            batchLines.clear();
-//                        }
-//                    }
-//
-//                    // 写入剩余数据
-//                    if (!batchLines.isEmpty()) {
-//                        long writeStart = System.currentTimeMillis();
-////                        writeBatchToFile(fileLines, second, decoderNumber);
-//                        System.out.println("succeed: " + second);
-//                        writeApiBlocking.writeRecord(
-//                                influxDbBucket,
-//                                influxDbOrg,
-//                                WritePrecision.NS,
-//                                String.join("\n", batchLines)
-//                        );
-//                        writeTime += System.currentTimeMillis() - writeStart;
-//                    }
-//                }
-//
-//                // 更新统计
-//                synchronized (Test2.class) {
-//                    totalReadTime.addAndGet(readTime);
-//                    totalCalcTime.addAndGet(calcTime);
-//                    totalProtocolTime.addAndGet(protocolTime);
-//                    totalWriteTime.addAndGet(writeTime);
-//                    totalProcessTime.addAndGet(System.currentTimeMillis() - batchStartTime);
-//                    processedRecords.addAndGet(recordsProcessed);
-//                    processedBatches.incrementAndGet();
-//                }
-//
-//                System.out.printf("完成批次处理 [记录数:%d, 耗时:%.3fs]%n",
-//                        recordsProcessed, (System.currentTimeMillis() - batchStartTime) / 1000.0);
-//
-//            } catch (Exception e) {
-//                System.err.println("处理十秒数据块时出错: " + e.getMessage());
-//                e.printStackTrace();
-//            }
-//        }));
-//    }
-
     // 十秒写入
     private static void processTenSecondsData3(List<String> dataBatch, int decoderNumber,
                                                WriteApiBlocking writeApiBlocking) {
@@ -622,6 +661,110 @@ public class MultiInsert {
 
             } catch (Exception e) {
                 System.err.println("处理十秒数据块时出错: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }));
+    }
+
+    private static void processSecondData4(ExecutorService executor, List<Future<?>> futures,
+                                           List<String> data, int decoderNumber,
+                                           WriteApiBlocking writeApiRaw, WriteApiBlocking writeApiSpecial,
+                                           Set<String> specialSeconds) {
+        if (data.isEmpty()) return;
+
+        String sampleSecond = data.get(0).split("\t")[2].trim();
+        boolean isSpecial = specialSeconds.contains(sampleSecond);
+
+        futures.add(executor.submit(() -> {
+            long batchStartTime = System.currentTimeMillis();
+            long readTime = 0, calcTime = 0, protocolTime = 0, writeTime = 0;
+            int recordsProcessed = 0;
+
+            List<String> rawProtocols = new ArrayList<>(MAX_PER_SECOND);
+            List<String> specialProtocols = new ArrayList<>(MAX_PER_SECOND);
+
+            try {
+                // 阶段1: 数据读入和解析
+                long readStart = System.currentTimeMillis();
+                List<double[]> originalValuesList = new ArrayList<>(data.size());
+                for (String line : data) {
+                    String[] columns = line.split("\t");
+                    originalValuesList.add(extractOriginalValues(columns));
+                }
+                readTime += System.currentTimeMillis() - readStart;
+
+                // 阶段处理循环
+                for (int i = 0; i < Math.min(data.size(), MAX_PER_SECOND); i++) {
+                    String line = data.get(i);
+                    String[] columns = line.split("\t");
+                    double[] originalValues = originalValuesList.get(i);
+
+                    // 阶段2: 构建原始协议
+                    long protocolStart = System.currentTimeMillis();
+                    long timestamp = convertTimestamp(sampleSecond, i, 1000);
+                    String rawProtocol = buildRawLineProtocol4(decoderNumber, originalValues, timestamp);
+                    rawProtocols.add(rawProtocol);
+                    protocolTime += System.currentTimeMillis() - protocolStart;
+
+                    // 阶段3: 特殊秒计算
+                    if (isSpecial) {
+                        long calcStart = System.currentTimeMillis();
+                        CalculateResult result = Calculator.calculate(originalValues, decoderNumber);
+                        calcTime += System.currentTimeMillis() - calcStart;
+
+                        long specProtocolStart = System.currentTimeMillis();
+                        String specialProtocol = buildLineProtocol4(
+                                decoderNumber, originalValues, result, timestamp
+                        );
+                        specialProtocols.add(specialProtocol);
+                        protocolTime += System.currentTimeMillis() - specProtocolStart;
+                    }
+
+                    recordsProcessed++;
+                }
+
+                // 阶段4: 数据写入
+                long writeStart = System.currentTimeMillis();
+                // 写入原始数据
+                if (!rawProtocols.isEmpty()) {
+                    for (int i = 0; i < rawProtocols.size(); i += BATCH_SIZE) {
+                        int end = Math.min(i + BATCH_SIZE, rawProtocols.size());
+                        writeApiRaw.writeRecord(influxDbBucket, influxDbOrg, WritePrecision.NS,
+                                String.join("\n", rawProtocols.subList(i, end)));
+                    }
+                }
+                // 写入特殊数据
+                if (!specialProtocols.isEmpty()) {
+                    for (int i = 0; i < specialProtocols.size(); i += BATCH_SIZE) {
+                        int end = Math.min(i + BATCH_SIZE, specialProtocols.size());
+                        writeApiSpecial.writeRecord(influxDbBucket2, influxDbOrg, WritePrecision.NS,
+                                String.join("\n", specialProtocols.subList(i, end)));
+                    }
+                }
+                writeTime = System.currentTimeMillis() - writeStart;
+
+                // 更新统计
+                synchronized (MultiInsert.class) {
+                    totalReadTime.addAndGet(readTime);
+                    totalCalcTime.addAndGet(calcTime);
+                    totalProtocolTime.addAndGet(protocolTime);
+                    totalWriteTime.addAndGet(writeTime);
+                    totalProcessTime.addAndGet(System.currentTimeMillis() - batchStartTime);
+                    processedRecords.addAndGet(recordsProcessed);
+                    processedBatches.incrementAndGet();
+                }
+
+//                System.out.printf("完成秒数据处理 [时间戳：%s 记录数:%d 耗时:%.3fs(读:%.3fs 算:%.3fs 协:%.3fs 写:%.3fs)]%n",
+//                        sampleSecond,
+//                        recordsProcessed,
+//                        (System.currentTimeMillis() - batchStartTime) / 1000.0,
+//                        readTime / 1000.0,
+//                        calcTime / 1000.0,
+//                        protocolTime / 1000.0,
+//                        writeTime / 1000.0);
+
+            } catch (Exception e) {
+                System.err.println("处理秒数据出错: " + e.getMessage());
                 e.printStackTrace();
             }
         }));
@@ -731,10 +874,47 @@ public class MultiInsert {
         return sb.toString();
     }
 
+    // 原始数据协议构建
+    private static String buildRawLineProtocol4(int decoderNumber, double[] originalValues, long timestampNs) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("sensor_data,decoder=%d ", decoderNumber));
+        for (int ch = 0; ch < 32; ch++) {
+            sb.append(String.format("Ch%d_ori=%f,", ch+1, originalValues[ch]));
+        }
+        sb.setLength(sb.length()-1); // 移除末尾逗号
+        sb.append(" ").append(timestampNs);
+        return sb.toString();
+    }
+
+    // 特殊数据协议构建
+    private static String buildLineProtocol4(int decoderNumber, double[] originalValues,
+                                                   CalculateResult result, long timestampNs) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("sensor_data,decoder=%d ", decoderNumber));
+
+        // 添加原始值
+        for (int ch = 0; ch < 32; ch++) {
+            sb.append(String.format("Ch%d_ori=%f,", ch+1, originalValues[ch]));
+        }
+
+        // 添加实际值
+        double[] actualValues = result.getActualValues();
+        for (int ch = 0; ch < actualValues.length; ch++) {
+            sb.append(String.format("Ch%d_act=%f,", ch+1, actualValues[ch]));
+        }
+
+        // 添加修正值
+        result.getReviseValues().forEach((k,v) -> sb.append(k).append("=").append(v).append(","));
+
+        sb.setLength(sb.length()-1);
+        sb.append(" ").append(timestampNs);
+        return sb.toString();
+    }
+
     private static void printFinalStatistics(long programStartTime) {
         long totalTime = System.currentTimeMillis() - programStartTime;
-        long otherTime = totalProcessTime.get() - totalReadTime.get() -
-                totalCalcTime.get() - totalProtocolTime.get() - totalWriteTime.get();
+        long otherTime = totalProcessTime.get() - totalReadTime.get() - totalCalcTime.get()
+                - totalProtocolTime.get() - totalWriteTime.get();
 
         System.out.println("\n============= 处理统计 =============");
         System.out.printf("总处理记录数: %,d 条\n", processedRecords.get());
@@ -751,7 +931,7 @@ public class MultiInsert {
         printStatRow("数据计算", totalCalcTime.get() / THREAD_POOL_SIZE, totalTime);
         printStatRow("协议拼接", totalProtocolTime.get() / THREAD_POOL_SIZE, totalTime);
         printStatRow("数据写入", totalWriteTime.get() / THREAD_POOL_SIZE, totalTime);
-        printStatRow("其他处理", otherTime, totalTime);
+        printStatRow("其他处理", otherTime/ THREAD_POOL_SIZE, totalTime);
         System.out.println("--------------------------------");
         System.out.printf("| %-15s | %9.3f | %6.1f |\n", "总计",
                 totalProcessTime.get() / 1000.0 / THREAD_POOL_SIZE, 100.0);

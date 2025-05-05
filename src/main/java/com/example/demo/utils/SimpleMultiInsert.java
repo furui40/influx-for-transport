@@ -7,9 +7,7 @@ import com.influxdb.client.WriteApi;
 import com.influxdb.client.WriteApiBlocking;
 import com.influxdb.client.WriteOptions;
 import com.influxdb.client.domain.WritePrecision;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -25,7 +23,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
-public class testUtil {
+public class SimpleMultiInsert {
 
     private static String influxDbOrg = "test";
     private static String influxDbBucket = "test7";

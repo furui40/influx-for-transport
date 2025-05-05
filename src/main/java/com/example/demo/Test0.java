@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import com.example.demo.service.HighSensorService;
 import com.example.demo.utils.*;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;
@@ -36,14 +37,16 @@ public class Test0 {
         System.out.println("started!");
 
         // 高频传感器写入
-//        DBUtilInsert.writeDataFromFile2(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        HighSensorService.processFile(client,"E:\\decoder\\01\\Wave_20240712_100000.txt");
+//        MultiInsert.writeDataFromFile3(client,"E:\\decoder\\01\\Wave_20240712_100000.txt");
+//        DBUtilInsert.writeDataFromFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
 //        DBUtilInsert.processAndWriteFile("E:\\decoder\\01\\Wave_20240712_000000_trans.txt",client);
 //        DBUtilInsert.processAndWriteFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt",320000);
 //        DBUtilInsert.writeDataFromFile0(client,"E:\\decoder\\01\\Wave_20240712_000000.txt",3_600_000);
 //        DBUtilInsert.writeDataFromFile0(client,"E:\\decoder\\01\\Wave_20240712_010000.txt",3_300_000);
 //        DBUtilInsert.writeDataFromFile0(client,"E:\\decoder\\01\\Wave_20240712_020000.txt",3_400_000);
-//        testUtil.writeDataFromFile(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
-//        testUtil.writeDataFromFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        SimpleMultiInsert.writeDataFromFile(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        SimpleMultiInsert.writeDataFromFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
 //        Test2.writeDataFromFile3(client,"E:\\decoder\\01\\Wave_20240712_110000.txt");
 //        client.close();
 

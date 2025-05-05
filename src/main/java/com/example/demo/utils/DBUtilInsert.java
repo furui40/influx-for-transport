@@ -508,10 +508,14 @@ public class DBUtilInsert {
         WriteApiBlocking writeApiBlocking = client.getWriteApiBlocking();
         BufferedReader reader = new BufferedReader(new FileReader(filePath));
         String line;
-        Map<String, Integer> timeCounts = new HashMap<>();
+        Map<String, Integer> timeCounts = new HashMap<>(); // 记录每个时间点的计数
         int processedLines = 0;
         int batchCount = 0;
-        long startTime = System.currentTimeMillis();
+        long startTime = System.currentTimeMillis(); // 记录开始时间
+        long t0 = 0;
+        long t1 = 0;
+        long t2 = 0;
+        long t3 = 0;
         List<Point> batchPoints = new ArrayList<>(BATCH_SIZE);
 
         // 提取解调器编号并转换为整数
@@ -521,6 +525,7 @@ public class DBUtilInsert {
         reader.readLine(); // 跳过表头
 
         while ((line = reader.readLine()) != null) {
+            long tn = System.currentTimeMillis();
             String[] columns = line.split("\t");
             if (columns.length < 4) continue;
 
@@ -542,11 +547,16 @@ public class DBUtilInsert {
                     originalValues[(i - 3) / 3] = 0.0;
                 }
             }
+            long tm = System.currentTimeMillis();
+            t0 = t0 + tm - tn;
 
             // 计算实际值和修正值
             CalculateResult result = Calculator.calculate(originalValues, decoderNumber);
             double[] actualValues = result.getActualValues();
             Map<String, Double> reviseValues = result.getReviseValues();
+
+            tn = System.currentTimeMillis();
+            t1 = t1 + tn - tm;
 
             // 创建单条Point并添加所有信道数据
             Point point = Point.measurement("sensor_data")
@@ -563,25 +573,34 @@ public class DBUtilInsert {
             // 添加修正值字段
             reviseValues.forEach((key, value) -> point.addField(key, value));
 
+            tm = System.currentTimeMillis();
+            t2 = t2 + tm - tn;
+
             batchPoints.add(point);
             processedLines++;
 
             // 批量写入
             if (batchPoints.size() >= BATCH_SIZE) {
+                System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，读取拆分数据时间为：" + (t0 / 1000.0) + " 秒");
+                System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，计算实际值时间为：" + (t1 / 1000.0) + " 秒");
+                System.out.println("即将开始写入 " + batchCount * BATCH_SIZE + " 条数据，设置数据点时间为：" + (t2 / 1000.0) + " 秒");
+                tn = System.currentTimeMillis();
                 writeApiBlocking.writePoints(influxDbBucket, influxDbOrg, batchPoints);
                 batchPoints.clear();
+                t3 = t3 + System.currentTimeMillis() - tn;
                 batchCount++;
-                System.out.printf("已写入 %d 条数据，累计用时：%.2f 秒%n",
-                        batchCount * BATCH_SIZE,
-                        (System.currentTimeMillis() - startTime) / 1000.0);
+                long elapsedTime = System.currentTimeMillis() - startTime;
+                System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，写入数据库时间为：" + (t3 / 1000.0) + " 秒");
+                System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
             }
         }
 
         // 处理剩余数据
         if (!batchPoints.isEmpty()) {
             writeApiBlocking.writePoints(influxDbBucket, influxDbOrg, batchPoints);
-            System.out.printf("剩余数据已写入，累计用时：%.2f 秒%n",
-                    (System.currentTimeMillis() - startTime) / 1000.0);
+            batchCount++;
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            System.out.println("已写入 " + batchCount * BATCH_SIZE + " 条数据，累计用时：" + (elapsedTime / 1000.0) + " 秒");
         }
 
         reader.close();
