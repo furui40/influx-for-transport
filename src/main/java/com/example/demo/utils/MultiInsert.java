@@ -754,15 +754,6 @@ public class MultiInsert {
                     processedBatches.incrementAndGet();
                 }
 
-//                System.out.printf("完成秒数据处理 [时间戳：%s 记录数:%d 耗时:%.3fs(读:%.3fs 算:%.3fs 协:%.3fs 写:%.3fs)]%n",
-//                        sampleSecond,
-//                        recordsProcessed,
-//                        (System.currentTimeMillis() - batchStartTime) / 1000.0,
-//                        readTime / 1000.0,
-//                        calcTime / 1000.0,
-//                        protocolTime / 1000.0,
-//                        writeTime / 1000.0);
-
             } catch (Exception e) {
                 System.err.println("处理秒数据出错: " + e.getMessage());
                 e.printStackTrace();
@@ -910,7 +901,6 @@ public class MultiInsert {
         sb.append(" ").append(timestampNs);
         return sb.toString();
     }
-
     private static void printFinalStatistics(long programStartTime) {
         long totalTime = System.currentTimeMillis() - programStartTime;
         long otherTime = totalProcessTime.get() - totalReadTime.get() - totalCalcTime.get()

@@ -144,7 +144,7 @@ public class HighSensorService {
 
 
     public static void processFile(InfluxDBClient influxDBClient, String filePath) throws IOException {
-        // 从文件路径解析时间范围（东八区）
+//      从文件路径解析时间范围（东八区）
         String fileName = new File(filePath).getName();
         Matcher m = Pattern.compile("Wave_(\\d{8})_(\\d{6})\\.txt").matcher(fileName);
         if (!m.find()) throw new IllegalArgumentException("无效文件名格式");
@@ -180,8 +180,9 @@ public class HighSensorService {
                 .map(zdt -> zdt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd,HH:mm:ss"))) // 注意冒号分隔符
                 .collect(Collectors.toSet());
 
-        // 写入函数
+//      写入函数
         MultiInsert.writeDataFromFile4(influxDBClient, filePath, new ArrayList<>(specialSeconds));
+//        MultiInsert.writeDataFromFile3(influxDBClient, filePath);
     }
 
     public static void checkAndPerformDataRevise(InfluxDBClient client, String baseDir, String filePath) throws IOException {

@@ -14,7 +14,7 @@ import java.util.Collections;
 import java.util.concurrent.ExecutionException;
 
 
-//@Component
+@Component
 public class Test0 {
 
     // 注入 application.yml 中的配置
@@ -38,8 +38,9 @@ public class Test0 {
 
         // 高频传感器写入
 //        HighSensorService.processFile(client,"E:\\decoder\\01\\Wave_20240712_100000.txt");
-//        MultiInsert.writeDataFromFile3(client,"E:\\decoder\\01\\Wave_20240712_100000.txt");
-//        DBUtilInsert.writeDataFromFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+//        MultiInsert.writeDataFromFile3(client,"E:\\decoder\\01\\Wave_20240712_000000.txt");
+        DBUtilInsert.writeDataFromFile1(client,"E:\\decoder\\01\\Wave_20240712_010000.txt");
+//        DBUtilInsert.writeDataFromFile2(client,"E:\\decoder\\01\\Wave_20240712_010000.txt");
 //        DBUtilInsert.processAndWriteFile("E:\\decoder\\01\\Wave_20240712_000000_trans.txt",client);
 //        DBUtilInsert.processAndWriteFile1(client,"E:\\decoder\\01\\Wave_20240712_000000.txt",320000);
 //        DBUtilInsert.writeDataFromFile0(client,"E:\\decoder\\01\\Wave_20240712_000000.txt",3_600_000);

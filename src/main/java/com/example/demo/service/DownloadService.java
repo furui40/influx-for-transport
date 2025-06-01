@@ -111,6 +111,7 @@ public class DownloadService {
 
         fluxQuery.append("|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")");
 
+        System.out.println(fluxQuery);
         return fluxQuery.toString();
     }
     public CommonResult<?> searchApply(InfluxDBClient client, String method, String userId) {

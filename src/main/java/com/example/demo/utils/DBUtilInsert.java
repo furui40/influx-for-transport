@@ -19,7 +19,7 @@ public class DBUtilInsert {
 
     private static String influxDbOrg = "test";
 
-    private static String influxDbBucket = "test8";
+    private static String influxDbBucket = "test2";
 
 
     public static final int BATCH_SIZE = 50000;
@@ -456,13 +456,13 @@ public class DBUtilInsert {
             // 处理每个信道的原始值和实际值
             for (int channel = 0; channel < 32; channel++) {
                 lineProtocolBuilder.append(String.format("Ch%d_ori=%f,", channel + 1, originalValues[channel])); // 原始值
-                lineProtocolBuilder.append(String.format("Ch%d_act=%f,", channel + 1, actualValues[channel])); // 实际值
+//                lineProtocolBuilder.append(String.format("Ch%d_act=%f,", channel + 1, actualValues[channel])); // 实际值
             }
 
             // 处理修正值
-            for (Map.Entry<String, Double> entry : reviseValues.entrySet()) {
-                lineProtocolBuilder.append(String.format("%s=%f,", entry.getKey(), entry.getValue()));
-            }
+//            for (Map.Entry<String, Double> entry : reviseValues.entrySet()) {
+//                lineProtocolBuilder.append(String.format("%s=%f,", entry.getKey(), entry.getValue()));
+//            }
             tm = System.currentTimeMillis();
             t2 = t2 + tm - tn;
             // 去掉最后一个逗号并添加时间戳
@@ -566,12 +566,12 @@ public class DBUtilInsert {
             // 添加32个信道的原始值和实际值
             for (int channel = 0; channel < 32; channel++) {
                 String channelKey = "Ch" + (channel + 1);
-                point.addField(channelKey + "_ori", originalValues[channel])
-                        .addField(channelKey + "_act", actualValues[channel]);
+                point.addField(channelKey + "_ori", originalValues[channel]);
+//                        .addField(channelKey + "_act", actualValues[channel]);
             }
 
             // 添加修正值字段
-            reviseValues.forEach((key, value) -> point.addField(key, value));
+//            reviseValues.forEach((key, value) -> point.addField(key, value));
 
             tm = System.currentTimeMillis();
             t2 = t2 + tm - tn;

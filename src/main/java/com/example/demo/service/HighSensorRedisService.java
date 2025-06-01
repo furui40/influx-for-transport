@@ -15,7 +15,7 @@ public class HighSensorRedisService {
     private static final String SUCCESS_SUFFIX = ":success";
     private static final String FAILED_SUFFIX = ":failed";
 
-    @Autowired
+
     @Qualifier("highSensorRedisTemplate")
     private RedisTemplate<String, Object> redisTemplate;
 

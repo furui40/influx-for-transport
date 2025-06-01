@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class SimpleMultiInsert {
 
     private static String influxDbOrg = "test";
-    private static String influxDbBucket = "test7";
+    private static String influxDbBucket = "test2";
 
     public static final int BATCH_SIZE = 100000;
 

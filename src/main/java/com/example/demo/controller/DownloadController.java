@@ -14,8 +14,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.File;
-import java.io.IOException;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -77,7 +75,6 @@ public class DownloadController {
             @RequestParam String method,
             @RequestParam String userId) {
         try {
-            // 调用 DownloadService 的查询方法
             return downloadService.searchApply(influxDBClient, method, userId);
         } catch (Exception e) {
             // 记录错误日志
@@ -189,8 +186,7 @@ public class DownloadController {
 
             // 新实现：分批次多线程查询
             final long BATCH_DURATION = 30 * 60; // 每轮最大查询30分钟(1800秒)
-            final long SEGMENT_DURATION = 30;     // 每个时间片15秒
-            final long REST_INTERVAL = 15 * 1000; // 强制休息15秒(毫秒)
+            final long SEGMENT_DURATION = 15;     // 每个时间片15秒
 
             long currentBatchStart = startTime;
             int totalFileCount = 0;
@@ -227,17 +223,6 @@ public class DownloadController {
                 );
 
                 totalFileCount += batchFileCount;
-
-                // 如果不是最后一批，则强制休息
-                if (currentBatchEnd < stopTime) {
-                    try {
-                        System.out.println("强制休息");
-                        Thread.sleep(REST_INTERVAL);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        LogUtil.logOperation(userId, "DOWNLOAD", "Thread sleep interrupted");
-                    }
-                }
 
                 currentBatchStart = currentBatchEnd;
             }
